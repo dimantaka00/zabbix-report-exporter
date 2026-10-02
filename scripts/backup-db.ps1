@@ -16,5 +16,7 @@ if ($LASTEXITCODE -eq 0) {
 
 # Hapus backup lebih dari 30 hari
 Get-ChildItem "$BackupDir\*.sql" |
-    Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-30) } |
+    Where-Object {
+        $_.LastWriteTime -lt (Get-Date).AddDays(-30)
+    } |
     Remove-Item -Force

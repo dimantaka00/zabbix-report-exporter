@@ -36,8 +36,6 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    ports:
-      - "8000:8000"
     volumes:
       - ./storage:/app/storage
     depends_on:
@@ -75,8 +73,6 @@ services:
       dockerfile: Dockerfile
     container_name: zabbix-report-frontend
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     depends_on:
       - backend
     networks:
