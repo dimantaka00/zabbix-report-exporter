@@ -1,2 +1,25 @@
-# Google App Engine generated folder
-appengine-generated/
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.py[cod]
+
+.venv/
+venv/
+
+node_modules/
+.next/
+
+backup/
+storage/
+
+*.log
+*.pdf
+
+zabbix-api.json
+zabbix-hosts.json
+zabbix-login.json
+schedule.json
+
+.DS_Store

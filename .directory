@@ -1,0 +1,140 @@
+zabbix-report-exporter/
+│
+├── docker-compose.yml
+├── .env.example
+├── .gitignore
+├── README.md
+├── Makefile
+│
+├── backend/
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   ├── alembic.ini
+│   │
+│   ├── app/
+│   │   ├── __init__.py
+│   │   ├── main.py
+│   │   │
+│   │   ├── core/
+│   │   │   ├── config.py
+│   │   │   ├── database.py
+│   │   │   ├── logging.py
+│   │   │   └── security.py
+│   │   │
+│   │   ├── api/
+│   │   │   ├── router.py
+│   │   │   └── v1/
+│   │   │       ├── auth.py
+│   │   │       ├── hosts.py
+│   │   │       ├── dashboards.py
+│   │   │       ├── graphs.py
+│   │   │       ├── reports.py
+│   │   │       ├── schedules.py
+│   │   │       └── settings.py
+│   │   │
+│   │   ├── models/
+│   │   │   ├── user.py
+│   │   │   ├── report.py
+│   │   │   ├── schedule.py
+│   │   │   └── zabbix.py
+│   │   │
+│   │   ├── schemas/
+│   │   │   ├── auth.py
+│   │   │   ├── host.py
+│   │   │   ├── report.py
+│   │   │   ├── schedule.py
+│   │   │   └── zabbix.py
+│   │   │
+│   │   ├── services/
+│   │   │   ├── zabbix/
+│   │   │   │   ├── client.py
+│   │   │   │   ├── auth.py
+│   │   │   │   ├── hosts.py
+│   │   │   │   ├── items.py
+│   │   │   │   ├── history.py
+│   │   │   │   ├── trends.py
+│   │   │   │   └── dashboards.py
+│   │   │   │
+│   │   │   ├── report/
+│   │   │   │   ├── generator.py
+│   │   │   │   ├── chart.py
+│   │   │   │   ├── template.py
+│   │   │   │   └── renderer.py
+│   │   │   │
+│   │   │   └── scheduler/
+│   │   │       ├── scheduler.py
+│   │   │       └── jobs.py
+│   │   │
+│   │   ├── templates/
+│   │   │   └── report/
+│   │   │       ├── daily.html
+│   │   │       ├── host.html
+│   │   │       └── components/
+│   │   │           ├── header.html
+│   │   │           ├── summary.html
+│   │   │           ├── graph.html
+│   │   │           └── footer.html
+│   │   │
+│   │   └── utils/
+│   │       ├── datetime.py
+│   │       ├── files.py
+│   │       └── validators.py
+│   │
+│   ├── migrations/
+│   │   └── versions/
+│   │
+│   └── tests/
+│       ├── test_zabbix.py
+│       ├── test_reports.py
+│       └── test_scheduler.py
+│
+├── frontend/
+│   ├── Dockerfile
+│   ├── package.json
+│   ├── next.config.js
+│   ├── tsconfig.json
+│   │
+│   ├── app/
+│   │   ├── page.tsx
+│   │   ├── layout.tsx
+│   │   │
+│   │   ├── dashboard/
+│   │   │   └── page.tsx
+│   │   │
+│   │   ├── hosts/
+│   │   │   └── page.tsx
+│   │   │
+│   │   ├── reports/
+│   │   │   ├── page.tsx
+│   │   │   └── create/
+│   │   │       └── page.tsx
+│   │   │
+│   │   ├── schedules/
+│   │   │   └── page.tsx
+│   │   │
+│   │   └── settings/
+│   │       └── page.tsx
+│   │
+│   ├── components/
+│   │   ├── dashboard/
+│   │   ├── hosts/
+│   │   ├── reports/
+│   │   ├── schedules/
+│   │   └── ui/
+│   │
+│   ├── lib/
+│   │   ├── api.ts
+│   │   ├── auth.ts
+│   │   └── utils.ts
+│   │
+│   └── types/
+│       ├── host.ts
+│       ├── report.ts
+│       └── schedule.ts
+│
+├── storage/
+│   ├── reports/
+│   └── charts/
+│
+└── nginx/
+    └── nginx.conf
