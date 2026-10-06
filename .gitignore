@@ -24,3 +24,12 @@ schedule.json
 
 .DS_Store
 zabbix
+.env
+node_modules/
+.next/
+frontend-pre-upgrade/
+*.bak
+*.backup
+*.dump
+frontend/Dockerfile.prod.txt
+frontend/Dockerfile.prod.yaml
