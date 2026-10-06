@@ -1,0 +1,76 @@
+services:
+  postgres:
+    restart: unless-stopped
+
+  redis:
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+  backend:
+    image: zabbix-report-exporter-backend:1.0.0
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; s=socket.create_connection(('127.0.0.1',8000),2); s.close()"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  worker:
+    image: zabbix-report-exporter-worker:1.0.0
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command:
+      [
+        "python",
+        "-m",
+        "app.services.scheduler.scheduler"
+      ]
+
+  frontend:
+    image: zabbix-report-exporter-frontend:1.0.0
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  nginx:
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+
+volumes:
+  postgres_data:
+  redis_data:
