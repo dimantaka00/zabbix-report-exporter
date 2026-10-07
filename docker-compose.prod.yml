@@ -19,13 +19,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import socket; s=socket.create_connection(('127.0.0.1',8000),2); s.close()"
-        ]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready',timeout=3)"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -44,12 +38,13 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command:
-      [
-        "python",
-        "-m",
-        "app.services.scheduler.scheduler"
-      ]
+    command: ["python", "-m", "app.services.scheduler.scheduler"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import time; from app.services.scheduler.heartbeat import HEARTBEAT_FILE; assert HEARTBEAT_FILE.exists() and time.time()-HEARTBEAT_FILE.stat().st_mtime < 60"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   frontend:
     image: zabbix-report-exporter-frontend:1.0.0
@@ -60,6 +55,12 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   nginx:
     restart: unless-stopped
@@ -67,7 +68,7 @@ services:
       backend:
         condition: service_healthy
       frontend:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "${HTTP_PORT:-8080}:80"
 

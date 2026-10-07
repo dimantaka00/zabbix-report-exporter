@@ -1,13 +1,5 @@
-from fastapi import FastAPI
+"""Compatibility entry point; the application is defined in app.main."""
 
-app = FastAPI(
-    title="Zabbix Report Exporter",
-    version="1.0.0"
-)
+from app.main import app
 
-@app.get("/health")
-async def health():
-    return {
-        "status": "ok",
-        "service": "zabbix-report-exporter"
-    }
+__all__ = ["app"]

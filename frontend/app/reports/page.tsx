@@ -1,166 +1,41 @@
 "use client";
+import {useEffect,useState} from "react";
+import HistoryTable from "../../components/HistoryTable";
+import {api} from "../../lib/api";
+import type {Execution} from "../../lib/api";
 
-import { useEffect, useState } from "react";
+type Report={filename:string;size:number;created:number;download_url:string};
+const PAGE=25;
 
-type Report = {
-  filename: string;
-  size: number;
-  created: number;
-  download_url: string;
-};
-
-export default function ReportsPage() {
-  const [reports, setReports] = useState<Report[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  async function loadReports() {
-    try {
-      setLoading(true);
-      setError("");
-
-      const response = await fetch(
-        "/api/v1/reports",
-        {
-          cache: "no-store",
-        }
-      );
-
-      const json = await response.json();
-
-      if (!response.ok || !json.success) {
-        throw new Error(
-          json.detail || "Gagal mengambil laporan."
-        );
-      }
-
-      setReports(json.data || []);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Gagal mengambil laporan."
-      );
-    } finally {
-      setLoading(false);
-    }
+export default function ReportsPage(){
+  const [reports,setReports]=useState<Report[]>([]),[history,setHistory]=useState<Execution[]>([]);
+  const [page,setPage]=useState(0),[total,setTotal]=useState(0),[historyPage,setHistoryPage]=useState(0),[historyTotal,setHistoryTotal]=useState(0);
+  const [loading,setLoading]=useState(true),[error,setError]=useState(""),[search,setSearch]=useState("");
+  async function refresh(){
+    setLoading(true);setError("");
+    try{
+      const [r,h]=await Promise.all([api<Report[]>(`/reports?limit=${PAGE}&offset=${page*PAGE}`),api<Execution[]>(`/history?limit=${PAGE}&offset=${historyPage*PAGE}`)]);
+      setReports(r.data);setTotal(r.total || 0);setHistory(h.data);setHistoryTotal(h.total || 0);
+    }catch(e){setError(e instanceof Error ? e.message : "Laporan gagal dimuat.");}
+    finally{setLoading(false);}
   }
-
-  useEffect(() => {
-    loadReports();
-  }, []);
-
-  function formatSize(bytes: number) {
-    if (bytes < 1024) return `${bytes} B`;
-
-    if (bytes < 1024 * 1024) {
-      return `${(bytes / 1024).toFixed(1)} KB`;
-    }
-
-    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  useEffect(()=>{refresh();},[page,historyPage]);
+  const filtered=reports.filter(r=>r.filename.toLowerCase().includes(search.toLowerCase()));
+  function pager(current:number,count:number,change:(n:number)=>void){
+    return <div className="pagination"><small>{count} hasil · halaman {current+1} dari {Math.max(Math.ceil(count/PAGE),1)}</small><div className="actions">
+      <button disabled={loading||current===0} onClick={()=>change(current-1)}>Sebelumnya</button><button disabled={loading||(current+1)*PAGE>=count} onClick={()=>change(current+1)}>Berikutnya</button></div></div>;
   }
-
-  function formatDate(timestamp: number) {
-    return new Date(
-      timestamp * 1000
-    ).toLocaleString("id-ID");
-  }
-
-  return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#f5f7fa",
-        padding: "32px",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "1100px",
-          margin: "0 auto",
-        }}
-      >
-        <h1>Report History</h1>
-
-        <p style={{ color: "#666" }}>
-          Daftar laporan PDF yang sudah dibuat.
-        </p>
-
-        {error && (
-          <div
-            style={{
-              padding: "12px",
-              background: "#ffe7e7",
-              marginBottom: "20px",
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        {loading && <p>Loading...</p>}
-
-        {!loading && reports.length === 0 && (
-          <div
-            style={{
-              background: "#fff",
-              padding: "40px",
-              borderRadius: "12px",
-            }}
-          >
-            Belum ada laporan.
-          </div>
-        )}
-
-        {reports.map((report) => (
-          <div
-            key={report.filename}
-            style={{
-              background: "#fff",
-              padding: "18px",
-              marginBottom: "12px",
-              borderRadius: "10px",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <div>
-              <strong>{report.filename}</strong>
-
-              <div
-                style={{
-                  color: "#777",
-                  marginTop: "6px",
-                }}
-              >
-                {formatDate(report.created)}
-                {" · "}
-                {formatSize(report.size)}
-              </div>
-            </div>
-
-            <a
-              href={report.download_url}
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                padding: "9px 14px",
-                borderRadius: "6px",
-                border: "1px solid #ccc",
-                textDecoration: "none",
-              }}
-            >
-              Download
-            </a>
-
-            <a href="/schedules">
-                Schedules
-            </a>
-          </div>
-        ))}
-      </div>
-    </main>
-  );
+  return <main><div className="page-heading"><div><p className="eyebrow">Report library</p><h1>Laporan & riwayat</h1><p className="muted">Unduh PDF dan tinjau hasil setiap eksekusi.</p></div><button onClick={refresh} disabled={loading}>Refresh laporan</button></div>
+    {error&&<div className="alert error" role="alert">{error}</div>}
+    <section className="card"><div className="card-heading"><h2>Arsip PDF</h2><a href="/">Buat laporan →</a></div>
+      <div className="filter-row"><input aria-label="Cari PDF pada halaman ini" placeholder="Cari PDF pada halaman ini…" value={search} onChange={e=>setSearch(e.target.value)} /></div>
+      {loading&&!reports.length?<p role="status">Memuat PDF…</p>:!filtered.length?<p className="empty">{reports.length ? "Tidak ada PDF yang cocok pada halaman ini." : "Belum ada laporan PDF."}</p>:
+        <div className="table-wrap"><table><thead><tr><th>Nama file</th><th>Dibuat</th><th>Ukuran</th><th>Unduh</th></tr></thead><tbody>
+          {filtered.map(r=><tr key={r.filename}><td style={{overflowWrap:"anywhere"}}>{r.filename}</td><td className="nowrap">{new Date(r.created*1000).toLocaleString("id-ID")}</td>
+            <td>{(r.size/1024).toFixed(1)} KB</td><td><a href={r.download_url} target="_blank" rel="noreferrer">Unduh PDF ↗</a></td></tr>)}
+        </tbody></table></div>}
+      {pager(page,total,setPage)}
+    </section>
+    <section className="card"><h2>Riwayat eksekusi</h2><HistoryTable rows={history} loading={loading} />{pager(historyPage,historyTotal,setHistoryPage)}</section>
+  </main>;
 }

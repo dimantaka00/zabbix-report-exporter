@@ -1,0 +1,19 @@
+{
+  "checked_at": "2026-10-07T02:34:08.114Z",
+  "services": {
+    "backend": "connected",
+    "postgresql": "connected",
+    "redis": "connected",
+    "zabbix": "connected",
+    "scheduler": "running"
+  },
+  "browser_errors": [],
+  "report": {
+    "filename": "zabbix_report_20261007_093407_722253_e988bdda.pdf",
+    "pages": 3,
+    "bytes": 4237,
+    "status": "PARTIAL"
+  },
+  "total_reports": 25,
+  "total_executions": 836
+}

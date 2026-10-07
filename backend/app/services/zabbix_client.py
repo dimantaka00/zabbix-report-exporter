@@ -1,5 +1,5 @@
-class ZabbixClient:
-    login()
-    get_hosts()
-    get_problems()
-    get_items()
+"""Compatibility import for the canonical Zabbix client."""
+
+from app.services.zabbix.client import ZabbixClient
+
+__all__ = ["ZabbixClient"]

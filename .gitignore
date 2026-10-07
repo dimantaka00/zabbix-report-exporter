@@ -33,3 +33,7 @@ frontend-pre-upgrade/
 *.dump
 frontend/Dockerfile.prod.txt
 frontend/Dockerfile.prod.yaml
+.cache/
+e2e/test-results/
+e2e/playwright-report/
+*.tsbuildinfo

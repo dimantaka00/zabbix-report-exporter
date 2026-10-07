@@ -1,241 +1,103 @@
 import json
-
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
 
-from app.core.database import (
-    decode_item_ids,
-    get_pool,
-)
+from app.core.database import decode_item_ids, get_pool
+from app.models.requests import ScheduleCreate, ScheduleUpdate, ScheduleStatus
+from app.services.scheduler.jobs import LOCK_NAMESPACE, run_schedule
+from app.services.zabbix.client import ZabbixClient
 
-
-router = APIRouter(
-    prefix="/schedules",
-    tags=["Schedules"],
-)
-
-
-class ScheduleCreate(BaseModel):
-    name: str
-    host_id: str | None = None
-    host_name: str
-    item_ids: list[str] = Field(
-        default_factory=list,
-    )
-    hour: int = Field(
-        default=7,
-        ge=0,
-        le=23,
-    )
-    minute: int = Field(
-        default=0,
-        ge=0,
-        le=59,
-    )
-    timezone: str = "Asia/Jakarta"
-    enabled: bool = True
-
-
-class ScheduleUpdate(ScheduleCreate):
-    pass
+router = APIRouter(prefix="/schedules", tags=["Schedules"])
 
 
 def row_to_dict(row):
-    return {
-        "id": row["id"],
-        "name": row["name"],
-        "host_id": row["host_id"],
-        "host_name": row["host_name"],
-        "item_ids": decode_item_ids(
-            row["item_ids"]
-        ),
-        "hour": row["hour"],
-        "minute": row["minute"],
-        "timezone": row["timezone"],
-        "enabled": row["enabled"],
-        "last_run_date": (
-            row["last_run_date"].isoformat()
-            if row["last_run_date"]
-            else None
-        ),
-        "created_at": row[
-            "created_at"
-        ].isoformat(),
-        "updated_at": row[
-            "updated_at"
-        ].isoformat(),
-    }
+    result = dict(row)
+    result["item_ids"] = decode_item_ids(result["item_ids"])
+    for key in ("last_run_date", "created_at", "updated_at", "next_retry_at"):
+        if result.get(key):
+            result[key] = result[key].isoformat()
+    return result
+
+
+async def validate(payload):
+    try:
+        host = await ZabbixClient().validate_selection(payload.host_id, payload.host_name, payload.item_ids)
+        return host["hostid"], host["name"] or host["host"]
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except Exception:
+        raise HTTPException(502, "Validasi metrik Zabbix gagal. Periksa koneksi API.")
 
 
 @router.get("")
 async def list_schedules():
-    pool = get_pool()
-
-    rows = await pool.fetch(
-        """
-        SELECT
-            id,
-            name,
-            host_id,
-            host_name,
-            item_ids,
-            hour,
-            minute,
-            timezone,
-            enabled,
-            last_run_date,
-            created_at,
-            updated_at
-        FROM report_schedules
-        ORDER BY created_at DESC;
-        """
-    )
-
-    return {
-        "success": True,
-        "data": [
-            row_to_dict(row)
-            for row in rows
-        ],
-    }
+    rows = await get_pool().fetch("SELECT * FROM report_schedules ORDER BY created_at DESC")
+    return {"success": True, "data": [row_to_dict(row) for row in rows]}
 
 
 @router.post("")
-async def create_schedule(
-    payload: ScheduleCreate,
-):
-    pool = get_pool()
+async def create_schedule(payload: ScheduleCreate):
+    host_id, host_name = await validate(payload)
+    row = await get_pool().fetchrow("""
+        INSERT INTO report_schedules (name, host_id, host_name, item_ids, hour, minute, timezone, enabled)
+        VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8) RETURNING *
+    """, payload.name, host_id, host_name, json.dumps(payload.item_ids), payload.hour,
+        payload.minute, payload.timezone, payload.enabled)
+    return {"success": True, "data": row_to_dict(row)}
 
-    row = await pool.fetchrow(
-        """
-        INSERT INTO report_schedules (
-            name,
-            host_id,
-            host_name,
-            item_ids,
-            hour,
-            minute,
-            timezone,
-            enabled
-        )
-        VALUES (
-            $1,
-            $2,
-            $3,
-            $4::jsonb,
-            $5,
-            $6,
-            $7,
-            $8
-        )
-        RETURNING
-            id,
-            name,
-            host_id,
-            host_name,
-            item_ids,
-            hour,
-            minute,
-            timezone,
-            enabled,
-            last_run_date,
-            created_at,
-            updated_at;
-        """,
-        payload.name,
-        payload.host_id,
-        payload.host_name,
-        json.dumps(payload.item_ids),
-        payload.hour,
-        payload.minute,
-        payload.timezone,
-        payload.enabled,
+
+async def lock_schedule(conn, schedule_id):
+    locked = await conn.fetchval(
+        "SELECT pg_try_advisory_xact_lock($1::int,$2::int)", LOCK_NAMESPACE, schedule_id,
     )
-
-    return {
-        "success": True,
-        "data": row_to_dict(row),
-    }
+    if not locked:
+        raise HTTPException(409, "Jadwal sedang diproses. Tunggu sebelum mengubah atau menghapus.")
+    row = await conn.fetchrow("SELECT * FROM report_schedules WHERE id=$1", schedule_id)
+    if row is None:
+        raise HTTPException(404, "Jadwal tidak ditemukan.")
+    return row
 
 
 @router.put("/{schedule_id}")
-async def update_schedule(
-    schedule_id: int,
-    payload: ScheduleUpdate,
-):
-    pool = get_pool()
+async def update_schedule(schedule_id: int, payload: ScheduleUpdate):
+    host_id, host_name = await validate(payload)
+    async with get_pool().acquire() as conn, conn.transaction():
+        await lock_schedule(conn, schedule_id)
+        row = await conn.fetchrow("""
+            UPDATE report_schedules SET name=$1,host_id=$2,host_name=$3,item_ids=$4::jsonb,
+                hour=$5,minute=$6,timezone=$7,enabled=$8,next_retry_at=NULL,last_error=NULL,
+                updated_at=NOW() WHERE id=$9 RETURNING *
+        """, payload.name, host_id, host_name, json.dumps(payload.item_ids), payload.hour,
+            payload.minute, payload.timezone, payload.enabled, schedule_id)
+    return {"success": True, "data": row_to_dict(row)}
 
-    row = await pool.fetchrow(
-        """
-        UPDATE report_schedules
-        SET
-            name = $1,
-            host_id = $2,
-            host_name = $3,
-            item_ids = $4::jsonb,
-            hour = $5,
-            minute = $6,
-            timezone = $7,
-            enabled = $8,
-            updated_at = NOW()
-        WHERE id = $9
-        RETURNING
-            id,
-            name,
-            host_id,
-            host_name,
-            item_ids,
-            hour,
-            minute,
-            timezone,
-            enabled,
-            last_run_date,
-            created_at,
-            updated_at;
-        """,
-        payload.name,
-        payload.host_id,
-        payload.host_name,
-        json.dumps(payload.item_ids),
-        payload.hour,
-        payload.minute,
-        payload.timezone,
-        payload.enabled,
-        schedule_id,
-    )
 
-    if not row:
-        raise HTTPException(
-            status_code=404,
-            detail="Schedule tidak ditemukan.",
-        )
+@router.patch("/{schedule_id}/status")
+async def change_status(schedule_id: int, payload: ScheduleStatus):
+    async with get_pool().acquire() as conn, conn.transaction():
+        await lock_schedule(conn, schedule_id)
+        row = await conn.fetchrow("""
+            UPDATE report_schedules SET enabled=$1,next_retry_at=NULL,last_error=NULL,
+                updated_at=NOW() WHERE id=$2 RETURNING *
+        """, payload.enabled, schedule_id)
+    return {"success": True, "data": row_to_dict(row)}
 
-    return {
-        "success": True,
-        "data": row_to_dict(row),
-    }
+
+@router.post("/{schedule_id}/run")
+async def run_now(schedule_id: int):
+    row = await get_pool().fetchrow("SELECT * FROM report_schedules WHERE id=$1", schedule_id)
+    if row is None:
+        raise HTTPException(404, "Jadwal tidak ditemukan.")
+    result = await run_schedule(row, force=True)
+    return {"success": True, "data": result}
 
 
 @router.delete("/{schedule_id}")
-async def delete_schedule(
-    schedule_id: int,
-):
-    pool = get_pool()
-
-    result = await pool.execute(
-        """
-        DELETE FROM report_schedules
-        WHERE id = $1;
-        """,
-        schedule_id,
-    )
-
-    if result == "DELETE 0":
-        raise HTTPException(
-            status_code=404,
-            detail="Schedule tidak ditemukan.",
-        )
-
-    return {
-        "success": True,
-    }
+async def delete_schedule(schedule_id: int):
+    async with get_pool().acquire() as conn, conn.transaction():
+        row = await lock_schedule(conn, schedule_id)
+        await conn.execute("""
+            UPDATE report_execution_logs SET schedule_name=COALESCE(schedule_name,$1),
+                host_name=COALESCE(host_name,$2) WHERE schedule_id=$3
+        """, row["name"], row["host_name"], schedule_id)
+        await conn.execute("DELETE FROM report_schedules WHERE id=$1", schedule_id)
+    return {"success": True}

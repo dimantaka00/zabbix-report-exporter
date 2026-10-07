@@ -1,0 +1,33 @@
+{
+    "checked_at":  "2026-10-07T02:45:29.2664076Z",
+    "pages":  [
+                  {
+                      "route":  "/",
+                      "status":  200
+                  },
+                  {
+                      "route":  "/schedules",
+                      "status":  200
+                  },
+                  {
+                      "route":  "/reports",
+                      "status":  200
+                  }
+              ],
+    "mobile_layout":  {
+                          "viewport":  393,
+                          "page_width":  393
+                      },
+    "services":  {
+                     "backend":  "connected",
+                     "postgresql":  "connected",
+                     "redis":  "connected",
+                     "zabbix":  "connected",
+                     "scheduler":  "running"
+                 },
+    "browser_errors":  [
+
+                       ],
+    "final_backend_image":  "sha256:781b8b41ad6826a5f8c32a24c7fbb45f81e0af525a0448a728a2b258ce4214b3",
+    "final_frontend_image":  "sha256:f88b818b030fc5ddc5620787f29473228bdf2db8050970c2b98253a5a39403a5"
+}

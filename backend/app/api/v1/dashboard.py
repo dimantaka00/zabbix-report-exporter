@@ -1,4 +1,3 @@
-import asyncio
 import os
 
 from fastapi import APIRouter
@@ -6,6 +5,7 @@ from fastapi import APIRouter
 from app.core.database import get_pool
 from app.core.config import settings
 from app.services.zabbix.client import ZabbixClient
+from app.services.scheduler.heartbeat import HEARTBEAT_KEY, create_redis_client
 
 
 router = APIRouter(
@@ -14,7 +14,7 @@ router = APIRouter(
 )
 
 
-REPORT_DIR = "/app/storage/reports"
+REPORT_DIR = settings.REPORT_STORAGE
 
 
 @router.get("/summary")
@@ -64,7 +64,7 @@ async def dashboard_status():
         "postgresql": "error",
         "redis": "error",
         "zabbix": "error",
-        "scheduler": "running",
+        "scheduler": "unknown",
     }
 
     # PostgreSQL
@@ -85,17 +85,17 @@ async def dashboard_status():
         redis_url = settings.REDIS_URL
 
         if redis_url:
-            import redis.asyncio as redis
-
-            client = redis.from_url(
-                redis_url,
-                decode_responses=True,
-            )
-
-            await client.ping()
-            await client.close()
-
-            status["redis"] = "connected"
+            client = create_redis_client()
+            try:
+                await client.ping()
+                worker_status = await client.get(HEARTBEAT_KEY)
+                status["redis"] = "connected"
+                if worker_status in ("starting", "running", "error"):
+                    status["scheduler"] = worker_status
+                elif worker_status is None:
+                    status["scheduler"] = "stopped"
+            finally:
+                await client.aclose()
 
     except Exception:
         status["redis"] = "error"

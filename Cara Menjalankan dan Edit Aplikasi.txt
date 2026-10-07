@@ -1,0 +1,163 @@
+Panduan operasional MVP LAN internal
+Dokumentasi utama: README.md
+Bukti penerimaan dan hasil pengujian: docs/mvp-checklist.md
+Jalankan perintah dari folder proyek pada komputer server.
+
+Menjalankan Aplikasi
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+Cek status:
+docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+
+Menghentikan Aplikasi
+docker compose -f docker-compose.yml -f docker-compose.prod.yml stop
+
+Menjalankan Kembali
+docker compose -f docker-compose.yml -f docker-compose.prod.yml start
+
+Restart
+docker compose -f docker-compose.yml -f docker-compose.prod.yml restart
+
+Melihat Log
+Backend:
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs backend --tail=100
+
+Worker:
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs worker --tail=100
+
+Nginx:
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs nginx --tail=100
+
+Frontend:
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs frontend --tail=100
+
+Health Check
+curl.exe -i http://localhost:8080/health
+
+Expected:
+HTTP/1.1 200 OK
+
+Zabbix API Test
+curl.exe -i http://localhost:8080/api/v1/zabbix/hosts
+
+Expected:
+HTTP/1.1 200 OK
+
+Schedule
+Melihat schedule:
+curl.exe -s http://localhost:8080/api/v1/schedules
+
+Schedule menggunakan timezone:
+Asia/Jakarta
+
+Report
+Melihat report:
+curl.exe -s http://localhost:8080/api/v1/reports
+
+PDF disimpan pada:
+storage/reports/
+
+Database Backup
+Backup otomatis menggunakan:
+scripts/backup-db.ps1
+
+Menjalankan manual:
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\backup-db.ps1"
+
+Backup disimpan pada:
+backup/
+
+Backup memakai arsip PostgreSQL custom (.dump) dan arsip PDF (.zip).
+Backup lama tetap disimpan.
+Scheduled Backup
+Windows Task Scheduler:
+Zabbix Report Database Backup
+
+Jadwal:
+Setiap hari pukul 02:00
+
+Cek:
+Get-ScheduledTaskInfo -TaskName "Zabbix Report Database Backup"
+
+Backup berhasil jika:
+LastTaskResult : 0
+
+Uji Restore Database
+Uji pemulihan memakai PostgreSQL sementara yang terpisah dari produksi:
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\test-restore.ps1" -BackupFile ".\backup\NAMA_BACKUP.dump"
+
+Script memeriksa hasil restore, lalu membersihkan container pengujian.
+Pemulihan database produksi memerlukan pemeriksaan backup dan persetujuan penggantian data.
+
+Port
+Hanya Nginx yang exposed ke LAN:
+8080 -> Nginx
+
+Backend:
+8000 -> Docker internal
+
+Frontend:
+3000 -> Docker internal
+
+PostgreSQL:
+5432 -> Docker internal
+
+Redis:
+6379 -> Docker internal
+
+Important
+Jangan commit:
+.env
+backup/
+storage/
+*.pdf
+zabbix
+
+Credential Zabbix dan database harus tetap berada di .env.
+Jangan menjalankan:
+docker compose -f docker-compose.yml -f docker-compose.prod.yml down -v
+
+kecuali memang ingin menghapus volume database.
+Recovery
+Jika container berhenti:
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+Cek:
+docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+
+Health:
+curl.exe -i http://localhost:8080/health
+
+Jika database bermasalah, gunakan backup database yang tersedia di:
+backup/
+
+Git
+Status:
+git status
+
+Push perubahan:
+git add .
+git commit -m "Update documentation"
+git push
+
+
+### Setelah menyimpan README
+
+Cek:
+
+```powershell
+git status
+
+Kemudian:
+git add README.md
+git commit -m "Add operational documentation"
+git push
+
+Lalu:
+git status
+
+Target akhir:
+Branch aktif sudah sinkron dengan remote GitHub.
+
+nothing to commit, working tree clean
