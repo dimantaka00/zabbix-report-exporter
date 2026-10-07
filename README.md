@@ -100,9 +100,8 @@ Script pertama memakai salinan database sementara dan membaca Zabbix nyata. Scri
 
 Untuk memeriksa tema pada desktop, tablet, dan ponsel tanpa menulis laporan atau jadwal, jalankan `node scripts/check-dashboard-theme.cjs`. Pemeriksaan memakai host 16500 dan metrik SNMP agent availability; host dapat diganti melalui `MVP_HOST_ID`. Bukti tersimpan di [dashboard-theme-validation.json](docs/dashboard-theme-validation.json); screenshot lokal ada di backup/light-enterprise-desktop.png dan backup/light-enterprise-mobile.png.
 
-Setelah pembaruan tema, drive C hanya memiliki sekitar 110 MB kosong. Tambahkan ruang kosong sebelum penggunaan rutin. Catatan ini terpisah dari kelulusan fitur aplikasi.
+Proyek server ini berada di `D:\KERJAAN\zabbix-report-exporter`; PDF dan backup mengikuti folder proyek. Disk Docker berada di `D:\DockerDesktopWSL`. Detail lokasi, verifikasi data, dan cara membuka workspace tersedia di [catatan migrasi penyimpanan](docs/storage-migration.md).
 
 ## Batas tahap ini
 
 Akses mengikuti LAN tepercaya; login/RBAC belum termasuk. Pengiriman email/WhatsApp, jadwal mingguan/bulanan, HA multi-server, dan kebijakan penghapusan otomatis PDF juga berada pada tahap berikutnya. Klaim selesai berlaku pada kriteria penerimaan MVP yang diuji, bukan jaminan bahwa semua kemungkinan kegagalan perangkat, jaringan, atau data eksternal dapat dieliminasi.
-

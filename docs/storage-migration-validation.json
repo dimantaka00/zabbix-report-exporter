@@ -1,0 +1,86 @@
+{
+  "checked_at": "2026-10-07T03:42:15.717Z",
+  "project_root": "D:\\KERJAAN\\zabbix-report-exporter",
+  "services": {
+    "backend": "connected",
+    "postgresql": "connected",
+    "redis": "connected",
+    "zabbix": "connected",
+    "scheduler": "running"
+  },
+  "old_reports_preserved": 25,
+  "report": {
+    "filename": "zabbix_report_20261007_104203_528363_1f472eee.pdf",
+    "path": "D:\\KERJAAN\\zabbix-report-exporter\\storage\\reports\\zabbix_report_20261007_104203_528363_1f472eee.pdf",
+    "status": "SUCCESS",
+    "bytes": 3179,
+    "pages": 2
+  },
+  "summary": {
+    "total_schedules": 2,
+    "active_schedules": 2,
+    "total_reports": 26
+  },
+  "execution_logs": 837,
+  "browser_errors": [],
+  "views": [
+    {
+      "name": "desktop",
+      "route": "/",
+      "page": 1440,
+      "viewport": 1440
+    },
+    {
+      "name": "desktop",
+      "route": "/schedules",
+      "page": 1440,
+      "viewport": 1440
+    },
+    {
+      "name": "desktop",
+      "route": "/reports",
+      "page": 1440,
+      "viewport": 1440
+    },
+    {
+      "name": "mobile",
+      "route": "/",
+      "page": 393,
+      "viewport": 393
+    },
+    {
+      "name": "mobile",
+      "route": "/schedules",
+      "page": 393,
+      "viewport": 393
+    },
+    {
+      "name": "mobile",
+      "route": "/reports",
+      "page": 393,
+      "viewport": 393
+    }
+  ],
+  "relocation": {
+    "project_files_verified": 27553,
+    "project_bytes_verified": 892938310,
+    "docker_data_root": "D:\\DockerDesktopWSL",
+    "docker_wsl_main": "D:\\DockerDesktopWSL\\main",
+    "offline_disk_backup": "backup/docker-before-migration",
+    "offline_disk_hashes_verified": true,
+    "source_project_cleaned": true,
+    "source_contains_only_workspace_redirect": true,
+    "permissions_preserved": true,
+    "backup": {
+      "database": "backup/zabbix_report_20261007_104216_e61c5a4a.dump",
+      "reports": "backup/reports_20261007_104216_e61c5a4a.zip",
+      "restore_passed": true,
+      "restored_schedules": 2,
+      "restored_execution_logs": 837
+    },
+    "free_space_bytes": {
+      "C": 16815484928,
+      "D": 880904716288
+    }
+  }
+}

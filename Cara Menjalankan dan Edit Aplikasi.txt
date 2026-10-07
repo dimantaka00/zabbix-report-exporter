@@ -1,7 +1,11 @@
 Panduan operasional MVP LAN internal
 Dokumentasi utama: README.md
 Bukti penerimaan dan hasil pengujian: docs/mvp-checklist.md
-Jalankan perintah dari folder proyek pada komputer server.
+Lokasi proyek: D:\KERJAAN\zabbix-report-exporter
+Lokasi disk Docker: D:\DockerDesktopWSL
+Buka zabbix-report-exporter.code-workspace pada folder D di IDE.
+Jalankan perintah dari folder proyek pada komputer server:
+Set-Location -LiteralPath 'D:\KERJAAN\zabbix-report-exporter'
 
 Menjalankan Aplikasi
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d

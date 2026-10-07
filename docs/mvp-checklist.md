@@ -54,6 +54,6 @@ Migrasi menambahkan next_retry_at dan last_error pada jadwal, serta schedule_nam
 
 ## Catatan operasional server
 
-Drive C tersisa sekitar **110 MB** setelah penerapan tema Light enterprise (sebelumnya sekitar 280 MB pada verifikasi MVP). Instalasi Chromium awal mengalami ENOSPC; unduhan sementara dari sesi ini telah dibersihkan, dan pengujian beralih ke Chrome yang sudah terpasang. Aplikasi sedang berjalan sehat, tetapi kapasitas ini perlu ditambah sebelum penggunaan rutin agar PDF, log, backup, dan pembaruan dapat terus ditulis. Berkas pribadi, cache proyek lain, dan volume database tidak dibersihkan.
+Pada verifikasi awal, ruang kosong drive C sekitar 110 MB dan unduhan Chromium mengalami ENOSPC. Pada 7 Oktober 2026, proyek, PDF, backup, dan disk Docker dipindahkan ke D. Seluruh 27.553 berkas cocok sebelum sumber dibersihkan; 25 PDF lama tetap utuh, satu PDF verifikasi baru berstatus SUCCESS, dan backup baru berhasil dipulihkan pada database sementara. Setelah migrasi, C memiliki sekitar 15,66 GiB kosong dan D 820,41 GiB. Detail: [migrasi penyimpanan](storage-migration.md) dan [bukti verifikasi](storage-migration-validation.json).
 
 Login/RBAC, email/WhatsApp, jadwal mingguan/bulanan, HA multi-server, dan penghapusan otomatis arsip berada di luar MVP tahap ini. Pengujian membuktikan kasus yang dicatat, bukan menjamin bebas dari seluruh kemungkinan bug atau kegagalan jaringan/perangkat.
