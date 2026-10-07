@@ -1,0 +1,121 @@
+{
+  "checked_at": "2026-10-07T03:11:51.637Z",
+  "theme": "Light enterprise",
+  "browser_errors": [],
+  "views": [
+    {
+      "name": "desktop",
+      "routes": [
+        {
+          "route": "/",
+          "status": 200,
+          "page": 1440,
+          "viewport": 1440
+        },
+        {
+          "route": "/schedules",
+          "status": 200,
+          "page": 1440,
+          "viewport": 1440
+        },
+        {
+          "route": "/reports",
+          "status": 200,
+          "page": 1440,
+          "viewport": 1440
+        }
+      ],
+      "chart": "SNMP agent availability",
+      "layout": {
+        "page": 1440,
+        "viewport": 1440,
+        "sidebar_top": 0,
+        "sidebar_left": 0,
+        "sidebar_position": "fixed"
+      },
+      "services": {
+        "backend": "connected",
+        "postgresql": "connected",
+        "redis": "connected",
+        "zabbix": "connected",
+        "scheduler": "running"
+      }
+    },
+    {
+      "name": "tablet",
+      "routes": [
+        {
+          "route": "/",
+          "status": 200,
+          "page": 768,
+          "viewport": 768
+        },
+        {
+          "route": "/schedules",
+          "status": 200,
+          "page": 768,
+          "viewport": 768
+        },
+        {
+          "route": "/reports",
+          "status": 200,
+          "page": 768,
+          "viewport": 768
+        }
+      ],
+      "chart": "SNMP agent availability",
+      "layout": {
+        "page": 768,
+        "viewport": 768,
+        "sidebar_top": 0,
+        "sidebar_left": 0,
+        "sidebar_position": "static"
+      },
+      "services": {
+        "backend": "connected",
+        "postgresql": "connected",
+        "redis": "connected",
+        "zabbix": "connected",
+        "scheduler": "running"
+      }
+    },
+    {
+      "name": "mobile",
+      "routes": [
+        {
+          "route": "/",
+          "status": 200,
+          "page": 393,
+          "viewport": 393
+        },
+        {
+          "route": "/schedules",
+          "status": 200,
+          "page": 393,
+          "viewport": 393
+        },
+        {
+          "route": "/reports",
+          "status": 200,
+          "page": 393,
+          "viewport": 393
+        }
+      ],
+      "chart": "SNMP agent availability",
+      "layout": {
+        "page": 393,
+        "viewport": 393,
+        "sidebar_top": 0,
+        "sidebar_left": 0,
+        "sidebar_position": "static"
+      },
+      "services": {
+        "backend": "connected",
+        "postgresql": "connected",
+        "redis": "connected",
+        "zabbix": "connected",
+        "scheduler": "running"
+      }
+    }
+  ]
+}

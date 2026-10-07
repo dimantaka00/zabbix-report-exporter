@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from "react";
 import MetricPicker from "../components/MetricPicker";
 import Chart from "../components/Chart";
 import HistoryTable from "../components/HistoryTable";
+import Icon from "../components/Icon";
+import type {IconName} from "../components/Icon";
 import { api, numericItems, localInput, responseError } from "../lib/api";
 import type { Host, Item, MetricData, Execution } from "../lib/api";
 
@@ -19,6 +21,7 @@ export default function Home() {
   const [title,setTitle] = useState("ZABBIX MONITORING REPORT");
   const [summary,setSummary] = useState<Summary | null>(null);
   const [services,setServices] = useState<Record<string,string>>({});
+  const [updatedAt,setUpdatedAt] = useState<Date | null>(null);
   const [history,setHistory] = useState<Execution[]>([]);
   const [chart,setChart] = useState<MetricData | null>(null);
   const [loading,setLoading] = useState(true), [loadingItems,setLoadingItems] = useState(false);
@@ -34,7 +37,7 @@ export default function Home() {
     ]);
     const [stats,status,logs] = results;
     if (stats.status === "fulfilled") setSummary(stats.value.data);
-    if (status.status === "fulfilled") setServices(status.value.data);
+    if (status.status === "fulfilled") {setServices(status.value.data);setUpdatedAt(new Date());}
     if (logs.status === "fulfilled") setHistory(logs.value.data);
     const failure = results.find(r => r.status === "rejected");
     setDashboardError(failure?.status === "rejected" ? failure.reason.message : "");
@@ -105,25 +108,32 @@ export default function Home() {
   }
 
   return <main>
-    <div className="page-heading"><div><p className="eyebrow">Monitoring overview</p><h1>Monitoring & laporan</h1><p className="muted">Pilih metrik, tinjau data, dan buat laporan operasional.</p></div>
-      <button onClick={refreshDashboard}>Refresh dashboard</button></div>
+    <div className="page-heading dashboard-heading"><div className="heading-copy"><p className="eyebrow"><span className="eyebrow-dot"/>IT OPERATIONS</p><h1>Monitoring & laporan</h1><p className="muted">Pantau infrastruktur dan siapkan laporan operasional dalam satu workspace.</p></div>
+      <div className="heading-tools"><span className="sync-label"><Icon name="clock"/>{updatedAt ? `Diperbarui ${updatedAt.toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}` : "Menunggu pembaruan"}</span>
+      <button onClick={refreshDashboard}><Icon name="refresh"/>Refresh dashboard</button></div></div>
     {dashboardError && <div className="alert error" role="alert">{dashboardError}</div>}
     <div className="stat-grid">
-      {[["Host",loading ? "…" : hosts.length],["Laporan PDF",summary?.total_reports ?? "…"],
-        ["Jadwal aktif",summary?.active_schedules ?? "…"],["Total jadwal",summary?.total_schedules ?? "…"]].map(([label,value]) =>
-        <div key={String(label)}><span>{label}</span><strong>{value}</strong></div>)}
+      {[
+        ["Host",loading ? "…" : hosts.length,"server","Terdaftar di Zabbix"],
+        ["Laporan PDF",summary?.total_reports ?? "…","file","Tersimpan di arsip"],
+        ["Jadwal aktif",summary?.active_schedules ?? "…","calendar","Laporan otomatis"],
+        ["Total jadwal",summary?.total_schedules ?? "…","layers","Konfigurasi tersimpan"],
+      ].map(([label,value,icon,description]) =>
+        <div className="kpi-card" key={String(label)}><div className="kpi-header"><span>{label}</span><span className="kpi-icon"><Icon name={icon as IconName}/></span></div>
+          <strong>{value}</strong><small>{description}</small></div>)}
     </div>
-    <section className="card"><div className="card-heading"><h2>Status layanan</h2><small>Diperbarui setiap 30 detik</small></div>
-      <div className="status-grid">{[["backend","Backend"],["postgresql","Database"],["redis","Redis"],["zabbix","Zabbix"],["scheduler","Scheduler"]].map(([key,label]) => {
-        const value=services[key] || "checking", good=["connected","running"].includes(value);
-        return <span className="service" key={key}><span className={`dot ${good ? "ok" : ["error","stopped"].includes(value) ? "error" : ""}`} />
-          {label}<strong>{value}</strong></span>;
+    <section className="card"><div className="card-heading"><div className="section-title"><span className="section-icon"><Icon name="activity"/></span><div><h2>Status layanan</h2><p>Koneksi dan kesiapan sistem</p></div></div><span className="refresh-meta"><Icon name="refresh"/>Setiap 30 detik</span></div>
+      <div className="status-grid">{[["backend","Backend","server"],["postgresql","Database","database"],["redis","Redis","layers"],["zabbix","Zabbix","network"],["scheduler","Scheduler","calendar"]].map(([key,label,icon]) => {
+        const value=services[key] || "checking",good=["connected","running"].includes(value),failed=["error","stopped"].includes(value);
+        const captions:Record<string,string>={connected:"Terhubung",running:"Berjalan",starting:"Memulai",error:"Gangguan",stopped:"Berhenti",unknown:"Belum diketahui",checking:"Memeriksa…"};
+        return <div className={`service ${good ? "service-good" : failed ? "service-error" : "service-warning"}`} key={key}><span className="service-icon"><Icon name={icon as IconName}/></span>
+          <div className="service-details"><strong>{label}</strong><small>{captions[value] || value}</small></div><span className={`dot ${good ? "ok" : failed ? "error" : ""}`}/></div>;
       })}</div>
     </section>
     {error && <div className="alert error" role="alert">{error}</div>}
     {message && <div className={`alert ${partial ? "warning" : "success"}`} role="status">{message}</div>}
     <div className="grid-two">
-      <section className="card"><h2>Konfigurasi laporan</h2><div className="form-grid">
+      <section className="card report-config"><div className="card-heading"><div className="section-title"><span className="section-icon"><Icon name="sliders"/></span><div><h2>Konfigurasi laporan</h2><p>Host, periode, dan metrik</p></div></div><span className="panel-index">01</span></div><div className="form-grid">
         <label className="span-two"><span>Judul laporan</span><input value={title} maxLength={200} onChange={e => setTitle(e.target.value)} /></label>
         <label className="span-two"><span>Host</span><select value={hostId} onChange={e => {setError("");setHostId(e.target.value);}} disabled={loading}>
           <option value="">Pilih host</option>{hosts.map(h => <option key={h.hostid} value={h.hostid}>{h.name || h.host}</option>)}</select></label>
@@ -132,15 +142,15 @@ export default function Home() {
       </div><p className="info-note">Waktu mengikuti timezone browser. Periode maksimal 90 hari.</p>
         <MetricPicker items={items} selected={selected} onChange={setSelected} loading={loadingItems} />
         <div className="actions"><button className="primary" onClick={generate} disabled={!selected.length || generating}>
-          {generating ? "Membuat PDF…" : `Ekspor PDF (${selected.length} metrik)`}</button></div>
+          <Icon name="download"/>{generating ? "Membuat PDF…" : `Ekspor PDF (${selected.length} metrik)`}</button></div>
       </section>
-      <section className="card"><div className="card-heading"><h2>Pratinjau grafik</h2><span className="muted">Satu metrik</span></div>
+      <section className="card chart-card"><div className="card-heading"><div className="section-title"><span className="section-icon"><Icon name="chart"/></span><div><h2>Pratinjau grafik</h2><p>Data metrik terpilih</p></div></div><span className="panel-index">02</span></div>
         <label><span>Metrik grafik</span><select value={metricId} onChange={e => setMetricId(e.target.value)} disabled={!selected.length}>
           <option value="">Pilih metrik</option>{items.filter(i => selected.includes(i.itemid)).map(i => <option key={i.itemid} value={i.itemid}>{i.name}</option>)}</select></label>
-        <div className="actions"><button onClick={preview} disabled={!metricId || loadingChart}>{loadingChart ? "Memuat grafik…" : "Tampilkan grafik"}</button></div>
-        {chart ? <Chart data={chart} /> : <p className="empty">Pilih metrik dan tampilkan grafik untuk melihat statistiknya.</p>}
+        <div className="actions"><button onClick={preview} disabled={!metricId || loadingChart}><Icon name="activity"/>{loadingChart ? "Memuat grafik…" : "Tampilkan grafik"}</button></div>
+        {chart ? <Chart data={chart}/> : <div className="chart-empty"><span><Icon name="chart"/></span><strong>Pratinjau belum tersedia</strong><p>Pilih metrik dan tampilkan grafik untuk melihat data dan statistiknya.</p></div>}
       </section>
     </div>
-    <section className="card"><div className="card-heading"><h2>Riwayat eksekusi terbaru</h2><a href="/reports">Lihat semua riwayat →</a></div><HistoryTable rows={history} loading={false} /></section>
+    <section className="card"><div className="card-heading"><div className="section-title"><span className="section-icon"><Icon name="history"/></span><div><h2>Riwayat eksekusi terbaru</h2><p>Aktivitas laporan manual dan terjadwal</p></div></div><a href="/reports" className="history-link">Lihat semua riwayat<Icon name="arrow"/></a></div><HistoryTable rows={history} loading={false}/></section>
   </main>;
 }

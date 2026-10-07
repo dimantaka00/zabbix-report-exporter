@@ -1,6 +1,6 @@
 param(
     [string]$BackendImage = "codex-zabbix-backend-mvp:20261007",
-    [string]$FrontendImage = "codex-zabbix-frontend-mvp:20261007",
+    [string]$FrontendImage = "codex-zabbix-frontend-enterprise:20261007",
     [string]$BaseUrl = "http://localhost:8080"
 )
 

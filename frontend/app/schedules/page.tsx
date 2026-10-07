@@ -81,7 +81,7 @@ export default function SchedulesPage() {
     finally{setBusy(null);}
   }
 
-  return <main><div className="page-heading"><div><p className="eyebrow">Report automation</p><h1>Jadwal laporan</h1><p className="muted">Laporan harian menggunakan data hari kalender sebelumnya.</p></div><button onClick={() => refresh().catch(e => setError(e.message))}>Refresh jadwal</button></div>
+  return <main><div className="page-heading"><div><p className="eyebrow">Otomasi laporan</p><h1>Jadwal laporan</h1><p className="muted">Laporan harian menggunakan data hari kalender sebelumnya.</p></div><button onClick={() => refresh().catch(e => setError(e.message))}>Refresh jadwal</button></div>
     {error&&<div className="alert error" role="alert">{error}</div>}
     {message&&<div className="alert success" role="status">{message}</div>}
     <section className="card"><h2>{editing===null ? "Buat jadwal harian" : `Edit jadwal #${editing}`}</h2>

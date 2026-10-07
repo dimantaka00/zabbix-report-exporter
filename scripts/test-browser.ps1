@@ -1,4 +1,4 @@
-param([string]$FrontendImage = "codex-zabbix-frontend-mvp:20261007", [int]$Port = 3301)
+param([string]$FrontendImage = "codex-zabbix-frontend-enterprise:20261007", [int]$Port = 3301)
 $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $ContainerName = "zabbix-browser-test-" + [guid]::NewGuid().ToString("N").Substring(0,12)

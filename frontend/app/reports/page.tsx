@@ -25,7 +25,7 @@ export default function ReportsPage(){
     return <div className="pagination"><small>{count} hasil · halaman {current+1} dari {Math.max(Math.ceil(count/PAGE),1)}</small><div className="actions">
       <button disabled={loading||current===0} onClick={()=>change(current-1)}>Sebelumnya</button><button disabled={loading||(current+1)*PAGE>=count} onClick={()=>change(current+1)}>Berikutnya</button></div></div>;
   }
-  return <main><div className="page-heading"><div><p className="eyebrow">Report library</p><h1>Laporan & riwayat</h1><p className="muted">Unduh PDF dan tinjau hasil setiap eksekusi.</p></div><button onClick={refresh} disabled={loading}>Refresh laporan</button></div>
+  return <main><div className="page-heading"><div><p className="eyebrow">Arsip operasional</p><h1>Laporan & riwayat</h1><p className="muted">Unduh PDF dan tinjau hasil setiap eksekusi.</p></div><button onClick={refresh} disabled={loading}>Refresh laporan</button></div>
     {error&&<div className="alert error" role="alert">{error}</div>}
     <section className="card"><div className="card-heading"><h2>Arsip PDF</h2><a href="/">Buat laporan →</a></div>
       <div className="filter-row"><input aria-label="Cari PDF pada halaman ini" placeholder="Cari PDF pada halaman ini…" value={search} onChange={e=>setSearch(e.target.value)} /></div>

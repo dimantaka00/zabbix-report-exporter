@@ -1,7 +1,7 @@
 # Penerimaan MVP LAN internal
 
 Status aplikasi: **16/16 kriteria terpenuhi (100% checklist MVP)**.
-Diperiksa 7 Oktober 2026, terakhir sekitar 09:45 WIB.
+Diperiksa 7 Oktober 2026; verifikasi MVP sekitar 09:45 WIB, pembaruan tema Light enterprise sekitar 10:12 WIB.
 
 Batas yang disepakati pengguna: LAN internal melalui Nginx; login operator pada tahap berikutnya. Persentase ini mengukur fitur dan penerimaan aplikasi dalam batas tersebut. Kapasitas server dan ketersediaan Zabbix tetap menjadi prasyarat operasional.
 
@@ -34,17 +34,18 @@ Batas yang disepakati pengguna: LAN internal melalui Nginx; login operator pada 
 - Nginx config, Compose config, sintaks script PowerShell, TypeScript strict, pip check, dan git diff --check lulus.
 - Referensi rollback dan Compose override diperiksa valid. Penggantian image ke versi lama tidak sengaja dijalankan pada produksi untuk menguji kegagalan deployment.
 
-Bukti terstruktur: [uji PDF nyata](mvp-live-validation.json) dan [pemeriksaan deployment final](mvp-deployment-validation.json).
+Bukti terstruktur: [uji PDF nyata](mvp-live-validation.json), [pemeriksaan deployment MVP](mvp-deployment-validation.json), serta [tema Light enterprise pada desktop/tablet/ponsel](dashboard-theme-validation.json).
 Screenshot dan PDF verifikasi lokal tersedia di backup/mvp-live-dashboard.png, backup/mvp-final-mobile.png, dan backup/mvp-live-validation.pdf.
 
 ## Versi yang diterapkan
 
 - Backend/worker: codex-zabbix-backend-mvp:20261007, image ID sha256:781b8b41ad6826a5f8c32a24c7fbb45f81e0af525a0448a728a2b258ce4214b3.
-- Frontend final: codex-zabbix-frontend-mvp:20261007, image ID sha256:f88b818b030fc5ddc5620787f29473228bdf2db8050970c2b98253a5a39403a5.
+- Frontend saat ini: codex-zabbix-frontend-enterprise:20261007, image ID sha256:86057a9edb7b1b2b41bf15c6777c23e5c7aeab1ef3870adc7013b37959d7bea0.
 - Tag produksi tetap zabbix-report-exporter-{backend,worker,frontend}:1.0.0.
 - Snapshot sebelum penerapan MVP: backup/before-deploy-0e781ed69bdc-images.json dan arsip .dump dengan ID yang sama.
 - Snapshot sebelum perbaikan CSS ponsel: backup/before-deploy-7728c92b6338-images.json, backup/before-deploy-7728c92b6338-compose.json, dan arsip .dump.
 - Snapshot terakhir sebelum pemulihan log kedaluwarsa: backup/before-deploy-517a11e0a7ad-images.json, backup/before-deploy-517a11e0a7ad-compose.json, dan arsip .dump.
+- Snapshot sebelum tema Light enterprise: backup/before-deploy-a329c330f239-images.json, backup/before-deploy-a329c330f239-compose.json, dan arsip .dump.
 - Backup database dan PDF terpisah: backup/zabbix_report_20261007_092451_f27dd80f.dump dan backup/reports_20261007_092451_f27dd80f.zip.
 
 Worker memperbaiki status RUNNING yang berusia lebih dari batas permintaan (180 detik) ditambah 60 detik. Eksekusi terjadwal yang masih memegang advisory lock tetap dilindungi. Permintaan manual yang baru belum dianggap kedaluwarsa.
@@ -53,6 +54,6 @@ Migrasi menambahkan next_retry_at dan last_error pada jadwal, serta schedule_nam
 
 ## Catatan operasional server
 
-Drive C tersisa sekitar **280 MB** saat pemeriksaan akhir. Instalasi Chromium awal mengalami ENOSPC; unduhan sementara dari sesi ini telah dibersihkan, dan pengujian beralih ke Chrome yang sudah terpasang. Aplikasi sedang berjalan sehat, tetapi kapasitas ini perlu ditambah sebelum penggunaan rutin agar PDF, log, backup, dan pembaruan dapat terus ditulis. Berkas pribadi, cache proyek lain, dan volume database tidak dibersihkan.
+Drive C tersisa sekitar **110 MB** setelah penerapan tema Light enterprise (sebelumnya sekitar 280 MB pada verifikasi MVP). Instalasi Chromium awal mengalami ENOSPC; unduhan sementara dari sesi ini telah dibersihkan, dan pengujian beralih ke Chrome yang sudah terpasang. Aplikasi sedang berjalan sehat, tetapi kapasitas ini perlu ditambah sebelum penggunaan rutin agar PDF, log, backup, dan pembaruan dapat terus ditulis. Berkas pribadi, cache proyek lain, dan volume database tidak dibersihkan.
 
 Login/RBAC, email/WhatsApp, jadwal mingguan/bulanan, HA multi-server, dan penghapusan otomatis arsip berada di luar MVP tahap ini. Pengujian membuktikan kasus yang dicatat, bukan menjamin bebas dari seluruh kemungkinan bug atau kegagalan jaringan/perangkat.

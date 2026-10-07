@@ -2,6 +2,8 @@
 
 Aplikasi LAN internal untuk membaca metrik Zabbix, membuat laporan PDF, dan menjalankan laporan harian. MVP mencakup monitoring, laporan manual, jadwal harian, arsip PDF, riwayat eksekusi, serta backup dan uji pemulihan. Login operator berada pada tahap berikutnya, sesuai batas MVP yang disepakati.
 
+Dashboard menggunakan tema **Light enterprise**: latar terang, aksen biru, navigasi samping pada desktop, navigasi ringkas pada ponsel, kartu status layanan, dan grafik dengan area berwarna. Ikon SVG disimpan dalam kode tanpa font atau aset eksternal. Angka ringkasan dan waktu pembaruan berasal dari respons aplikasi.
+
 ## Alur penggunaan
 
 1. Buka `http://localhost:8080` atau alamat LAN komputer server.
@@ -53,7 +55,7 @@ Backend membuat tabel dan menambahkan kolom secara idempotent pada startup. Migr
 
 ```powershell
 docker build -t codex-zabbix-backend-mvp:20261007 backend
-docker build -f frontend/Dockerfile.prod -t codex-zabbix-frontend-mvp:20261007 frontend
+docker build -f frontend/Dockerfile.prod -t codex-zabbix-frontend-enterprise:20261007 frontend
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-regressions.ps1
 ```
 
@@ -96,7 +98,9 @@ node scripts/smoke-live.cjs
 
 Script pertama memakai salinan database sementara dan membaca Zabbix nyata. Script kedua memakai host 16500/metrik 917040 dan 917037 pada aplikasi aktif, serta membuat satu PDF manual verifikasi; sesuaikan fixture jika konfigurasi Zabbix berbeda. Bukti pengujian tersimpan di docs/mvp-live-validation.json.
 
-Pada validasi terakhir, drive C hanya memiliki sekitar 280 MB kosong. Tambahkan ruang kosong sebelum penggunaan rutin. Catatan ini terpisah dari kelulusan fitur aplikasi.
+Untuk memeriksa tema pada desktop, tablet, dan ponsel tanpa menulis laporan atau jadwal, jalankan `node scripts/check-dashboard-theme.cjs`. Pemeriksaan memakai host 16500 dan metrik SNMP agent availability; host dapat diganti melalui `MVP_HOST_ID`. Bukti tersimpan di [dashboard-theme-validation.json](docs/dashboard-theme-validation.json); screenshot lokal ada di backup/light-enterprise-desktop.png dan backup/light-enterprise-mobile.png.
+
+Setelah pembaruan tema, drive C hanya memiliki sekitar 110 MB kosong. Tambahkan ruang kosong sebelum penggunaan rutin. Catatan ini terpisah dari kelulusan fitur aplikasi.
 
 ## Batas tahap ini
 
