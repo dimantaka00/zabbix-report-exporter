@@ -38,7 +38,7 @@ export default function Home() {
   const [reportMonth,setReportMonth] = useState("");
   const [firstDay,setFirstDay] = useState("1"), [lastDay,setLastDay] = useState("31");
   const [resolution,setResolution] = useState<"minute" | "hourly" | "auto">("minute");
-  const [title,setTitle] = useState("ZABBIX MONITORING REPORT");
+  const [title,setTitle] = useState("");
   const [downtimeTriggerId,setDowntimeTriggerId] = useState("");
   const [includeDowntime,setIncludeDowntime] = useState(true);
   const [summary,setSummary] = useState<Summary | null>(null);
@@ -169,7 +169,7 @@ export default function Home() {
   }
 
   return <main>
-    <div className="page-heading dashboard-heading"><div className="heading-copy"><p className="eyebrow"><span className="eyebrow-dot"/>IT OPERATIONS</p><h1>Monitoring & laporan</h1><p className="muted">Pantau infrastruktur dan siapkan laporan operasional dalam satu workspace.</p></div>
+    <div className="page-heading dashboard-heading"><div className="heading-copy"><p className="eyebrow"><span className="eyebrow-dot"/>TIM DATA CENTER PUSDATIN KEMENSOS</p><h1>Monitoring & laporan</h1><p className="muted">Pantau infrastruktur dan siapkan laporan operasional dalam satu workspace.</p></div>
       <div className="heading-tools"><span className="sync-label"><Icon name="clock"/>{updatedAt ? `Diperbarui ${updatedAt.toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}` : "Menunggu pembaruan"}</span>
       <button onClick={refreshDashboard}><Icon name="refresh"/>Refresh dashboard</button></div></div>
     {dashboardError && <div className="alert error" role="alert">{dashboardError}</div>}

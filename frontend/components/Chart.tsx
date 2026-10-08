@@ -73,7 +73,7 @@ function DayChart({data,day}: {data: MetricData; day: Day}) {
       <title>{data.item.name} — {day.label}, 00:00–23:59</title>
       <text x="70" y="16" fontSize="10" fill="var(--chart-label)">{scale.unit || "Nilai"}</text>
       <defs><linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stopColor="#3b82f6" stopOpacity=".18"/><stop offset="100%" stopColor="#3b82f6" stopOpacity=".01"/>
+        <stop offset="0%" stopColor="var(--chart-fill)" stopOpacity=".18"/><stop offset="100%" stopColor="var(--chart-fill)" stopOpacity=".01"/>
       </linearGradient></defs>
       {[0,1,2,3,4].map(tick=><g key={tick}><line x1="70" x2="720" y1={230-tick*51.25} y2={230-tick*51.25} stroke="var(--chart-grid)" strokeDasharray={tick===0 ? undefined : "4 5"}/>
         <text x="59" y={234-tick*51.25} textAnchor="end" fontSize="11" fill="var(--chart-label)">{metricNumber((minimum+(maximum-minimum)*tick/4)*scale.factor,scale.unit)}</text></g>)}
@@ -85,12 +85,12 @@ function DayChart({data,day}: {data: MetricData; day: Day}) {
       })}
       {coords.length>1 && <path d={area} fill={`url(#${fillId})`} stroke="none"/>}
       {points.filter(point=>point.min !== undefined && point.max !== undefined && point.min !== point.max).map((point,i)=>
-        <line key={i} x1={x(point)} x2={x(point)} y1={y(point.min!)} y2={y(point.max!)} stroke="#93c5fd" strokeWidth="1"/>)}
-      <path d={path} fill="none" stroke="#2563eb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      {coords.length===1 && <circle cx={coords[0][0]} cy={coords[0][1]} r="4" fill="#2563eb"/>}
+        <line key={i} x1={x(point)} x2={x(point)} y1={y(point.min!)} y2={y(point.max!)} stroke="var(--chart-range)" strokeWidth="1"/>)}
+      <path d={path} fill="none" stroke="var(--chart-stroke)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      {coords.length===1 && <circle cx={coords[0][0]} cy={coords[0][1]} r="4" fill="var(--chart-stroke)"/>}
       {!day.points.length && <text x="395" y="130" textAnchor="middle" fontSize="13" fill="var(--chart-label)">Tidak ada data pada hari ini</text>}
-      {hovered && <g><line x1={x(hovered)} x2={x(hovered)} y1="25" y2="230" stroke="#2563eb" strokeDasharray="3 3"/>
-        <circle cx={x(hovered)} cy={y(hovered.value)} r="4" fill="#2563eb"/></g>}
+      {hovered && <g><line x1={x(hovered)} x2={x(hovered)} y1="25" y2="230" stroke="var(--chart-stroke)" strokeDasharray="3 3"/>
+        <circle cx={x(hovered)} cy={y(hovered.value)} r="4" fill="var(--chart-stroke)"/></g>}
       <text x="720" y="252" textAnchor="end" fontSize="10" fill="var(--chart-label)">23:59</text>
       <text x="395" y="275" textAnchor="middle" fontSize="10" fill="var(--chart-label)">Waktu (HH:MM)</text>
     </svg></div>

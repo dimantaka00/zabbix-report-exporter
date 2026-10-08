@@ -2,7 +2,11 @@
 
 Aplikasi LAN internal untuk membaca metrik Zabbix, membuat laporan PDF, dan menjalankan laporan harian. MVP mencakup monitoring, laporan manual, jadwal harian, arsip PDF, riwayat eksekusi, serta backup dan uji pemulihan. Login operator berada pada tahap berikutnya, sesuai batas MVP yang disepakati.
 
-Dashboard menggunakan tema **Light enterprise**: latar terang, aksen biru, navigasi samping pada desktop, navigasi ringkas pada ponsel, kartu status layanan, dan grafik dengan area berwarna. Ikon SVG disimpan dalam kode tanpa font atau aset eksternal. Angka ringkasan dan waktu pembaruan berasal dari respons aplikasi.
+Dashboard menyediakan **mode terang dan gelap** dengan aksen biru, navigasi samping pada desktop, navigasi ringkas pada ponsel, kartu status layanan, dan grafik dengan area berwarna. Tombol tema berada di bar atas pada semua halaman. Tema awal mengikuti pengaturan perangkat; pilihan manual tersimpan di browser, bertahan setelah reload, dan disinkronkan antar-tab. Formulir, tabel, badge, serta grafik mengikuti tema. Ikon SVG disimpan dalam kode tanpa font atau aset eksternal. Angka ringkasan dan waktu pembaruan berasal dari respons aplikasi.
+
+**Developed by Daniel Christoper I.P** — kredit pengembang ditampilkan di footer seluruh halaman.
+
+Identitas dashboard menggunakan **TIM DATA CENTER PUSDATIN KEMENSOS**. Logo Kemensos di pojok kiri atas disimpan lokal pada `frontend/public/brand/kemensos.png`, bersumber dari [aset situs resmi Kementerian Sosial](https://kemensos.go.id/assets/img/favicon.png), agar tersedia tanpa akses internet dari browser pengguna.
 
 ## Alur penggunaan
 

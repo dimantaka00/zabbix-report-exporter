@@ -15,7 +15,7 @@ from reportlab.platypus import (
 
 from app.core.config import settings
 from app.services.report.data import daily_data, summarize_points
-from app.services.report.units import bandwidth_number, display_unit, format_network_value, unit_group, is_bandwidth_unit, conversion_caption
+from app.services.report.units import bandwidth_number, display_unit, format_network_value, unit_group, is_bandwidth_unit
 from app.services.report.downtime import STATUS_LABELS, duration_text, duration_detail
 
 REPORT_DIR = settings.REPORT_STORAGE
@@ -214,15 +214,6 @@ def generate_multi_item_pdf(host_name, item_data_list, time_from, time_till,
                             colWidths=[CONTENT_WIDTH * fraction for fraction in (.32, .17, .17, .17, .17)])
             summary.setStyle(table_style())
             story.append(summary)
-            story.extend([Spacer(1, 6), Paragraph(
-                "Last is the final Zabbix sample in the selected day ('-' when only trends are available). "
-                "Min/Max preserve the original sample extrema; Average is weighted by sample count. "
-                "Time detail follows the Zabbix collection interval; minutes without samples are not filled.",
-                styles["BodyText"],
-            )])
-            caption = conversion_caption(day['item'].get('units'))
-            if caption:
-                story.append(Paragraph(text(caption), styles["BodyText"]))
     if downtime is not None:
         if section:
             story.append(PageBreak())
@@ -260,11 +251,6 @@ def generate_multi_item_pdf(host_name, item_data_list, time_from, time_till,
         as_of = downtime.get("as_of")
         if as_of:
             story.append(Paragraph(f"Updated: {datetime.fromtimestamp(as_of, tz).strftime('%d/%m/%Y %H:%M:%S')}", styles["BodyText"]))
-        story.extend([Spacer(1, 8), Paragraph(
-            "Start Time and End Time follow Zabbix problem and recovery events. Duration covers the full "
-            "outage until recovery, or until the update time for ongoing outages. The total counts only time "
-            "within the selected period, with overlaps counted once. No Downtime means no events were recorded; "
-            "availability depends on event retention and read permissions.", styles["BodyText"])])
 
     def footer(canvas, doc):
         canvas.saveState()

@@ -59,9 +59,103 @@ async function mockAPI(page:Page, disposition='attachment; filename="Test_host_2
 }
 test.beforeEach(async({page})=>{
   const errors:string[]=[];page.on("pageerror",e=>errors.push(e.message));
+  page.on("console",message=>{
+    if(message.type()==="error" && /hydration|hydrating|Minified React error/i.test(message.text()))errors.push(message.text());
+  });
   (page as any).__runtimeErrors=errors;
 });
 test.afterEach(async({page})=>{expect((page as any).__runtimeErrors).toEqual([]);});
+
+test("theme preference persists across pages and reloads with the developer credit",async({page})=>{
+  await page.emulateMedia({colorScheme:"light"});
+  await mockAPI(page);await page.goto("/");
+  const toggle=page.getByRole("switch",{name:"Mode gelap"});
+  await expect(toggle).not.toBeChecked();
+  await page.getByRole("combobox",{name:"Host",exact:true}).selectOption("1");
+  await page.getByRole("checkbox",{name:"CPU"}).check();
+  await page.getByRole("button",{name:"Tampilkan grafik"}).click();
+  await expect(page.getByRole("img",{name:"Grafik CPU"})).toBeVisible();
+  await page.screenshot({path:test.info().outputPath("theme-light-dashboard.png"),fullPage:true});
+  await toggle.click();
+  await expect(toggle).toBeChecked();
+  await expect(page.locator("html")).toHaveAttribute("data-theme","dark");
+  await expect(page.locator(".theme-dark-label")).toBeVisible();
+  await expect(page.locator(".theme-light-label")).toBeHidden();
+  expect(await page.evaluate(()=>getComputedStyle(document.body).backgroundColor)).toBe("rgb(11, 18, 32)");
+  await expect(page.getByRole("img",{name:"Grafik CPU"}).locator('path[fill="none"]')).toHaveCSS("stroke","rgb(127, 181, 252)");
+  expect(await page.evaluate(()=>localStorage.getItem("zabbix-report-theme"))).toBe("dark");
+  await page.screenshot({path:test.info().outputPath("theme-dark-dashboard.png"),fullPage:true});
+  for(const label of ["Jadwal","Laporan","Monitoring"]) {
+    await page.getByRole("navigation").getByRole("link",{name:label,exact:true}).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme","dark");
+    await expect(toggle).toBeChecked();
+    await expect(page.locator(".developer-credit")).toHaveText("Developed by Daniel Christoper I.P");
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
+    if(label!=="Monitoring")await page.screenshot({path:test.info().outputPath(`theme-dark-${label}.png`),fullPage:true});
+  }
+  await page.reload();await expect(toggle).toBeChecked();
+  await toggle.click();await expect(toggle).not.toBeChecked();
+  await expect(page.locator("html")).toHaveAttribute("data-theme","light");
+  expect(await page.evaluate(()=>getComputedStyle(document.body).backgroundColor)).toBe("rgb(245, 247, 251)");
+  await page.reload();await expect(toggle).not.toBeChecked();
+});
+
+test("theme follows the system until the user saves a preference",async({page})=>{
+  await page.emulateMedia({colorScheme:"dark"});
+  await mockAPI(page);await page.goto("/");
+  const toggle=page.getByRole("switch",{name:"Mode gelap"});
+  await expect(page.locator("html")).toHaveAttribute("data-theme","dark");
+  await expect(toggle).toBeChecked();
+  expect(await page.evaluate(()=>localStorage.getItem("zabbix-report-theme"))).toBeNull();
+  await page.emulateMedia({colorScheme:"light"});await expect(toggle).not.toBeChecked();
+  await page.emulateMedia({colorScheme:"dark"});await expect(toggle).toBeChecked();
+  await toggle.click();await expect(toggle).not.toBeChecked();
+  await page.emulateMedia({colorScheme:"light"});
+  await page.emulateMedia({colorScheme:"dark"});
+  await expect(toggle).not.toBeChecked();
+  await page.reload();await expect(toggle).not.toBeChecked();
+  await expect(page.locator("html")).toHaveAttribute("data-theme","light");
+});
+
+test("theme changes synchronize between browser tabs",async({page,context})=>{
+  await context.addInitScript(()=>{
+    if(!localStorage.getItem("zabbix-report-theme"))localStorage.setItem("zabbix-report-theme","light");
+  });
+  await mockAPI(page);await page.goto("/");
+  const second=await context.newPage(),errors:string[]=[];
+  second.on("pageerror",error=>errors.push(error.message));
+  second.on("console",message=>{
+    if(message.type()==="error" && /hydration|hydrating|Minified React error/i.test(message.text()))errors.push(message.text());
+  });
+  await mockAPI(second);await second.goto("/reports");
+  const firstToggle=page.getByRole("switch",{name:"Mode gelap"});
+  const secondToggle=second.getByRole("switch",{name:"Mode gelap"});
+  await expect(firstToggle).not.toBeChecked();await expect(secondToggle).not.toBeChecked();
+  await firstToggle.click();await expect(secondToggle).toBeChecked();
+  await expect(second.locator("html")).toHaveAttribute("data-theme","dark");
+  await secondToggle.click();await expect(firstToggle).not.toBeChecked();
+  await expect(page.locator("html")).toHaveAttribute("data-theme","light");
+  expect(errors).toEqual([]);
+  await second.close();
+});
+
+test("theme can still be changed when browser storage is unavailable",async({page})=>{
+  await page.addInitScript(()=>{
+    Storage.prototype.getItem=()=>{throw new DOMException("Storage blocked","SecurityError");};
+    Storage.prototype.setItem=()=>{throw new DOMException("Storage blocked","SecurityError");};
+  });
+  await page.emulateMedia({colorScheme:"light"});
+  await mockAPI(page);await page.goto("/");
+  const toggle=page.getByRole("switch",{name:"Mode gelap"});
+  await expect(toggle).not.toBeChecked();
+  await toggle.click();await expect(toggle).toBeChecked();
+  await page.emulateMedia({colorScheme:"dark"});
+  await page.emulateMedia({colorScheme:"light"});
+  await expect(toggle).toBeChecked();
+  await page.getByRole("navigation").getByRole("link",{name:"Jadwal",exact:true}).click();
+  await expect(toggle).toBeChecked();
+  await toggle.click();await expect(toggle).not.toBeChecked();
+});
 
 test("host status filters include disabled hosts and retain the selected host for PDF export",async({page})=>{
   const state=await mockAPI(page);await page.goto("/");
@@ -82,6 +176,7 @@ test("host status filters include disabled hosts and retain the selected host fo
   await expect(select).toHaveValue("2");
   await expect(picker).toContainText("Host terpilih tetap ditampilkan");
   await page.getByRole("checkbox",{name:"Include downtime in PDF"}).uncheck();
+  await page.getByLabel("Judul laporan",{exact:true}).fill("Archived router history");
   const download=page.waitForEvent("download");
   await page.getByRole("button",{name:"Ekspor PDF (1 metrik)"}).click();await download;
   expect(state.generated().host_id).toBe("2");
@@ -121,6 +216,7 @@ test("disabled hosts remain selectable when creating a daily schedule",async({pa
 
 test("dashboard previews constant data and exports several metrics with partial warning",async({page})=>{
   const state=await mockAPI(page);await page.goto("/");
+  await expect(page.getByLabel("Judul laporan",{exact:true})).toHaveValue("");
   await page.getByLabel("Cari host").fill("test");
   await page.getByRole("combobox",{name:"Host",exact:true}).selectOption("1");
   await page.getByLabel("Cari metrik").fill("11");
@@ -136,12 +232,17 @@ test("dashboard previews constant data and exports several metrics with partial 
   await expect(page.getByRole("img",{name:"Grafik CPU"})).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
   await expect(page.getByRole("table",{name:"Statistik harian"})).toContainText("Average");
+  await page.getByRole("button",{name:"Ekspor PDF (2 metrik)"}).click();
+  await expect(page.getByRole("alert").filter({hasText:"Judul laporan wajib diisi."})).toBeVisible();
+  expect(state.generated()).toBeNull();
+  await page.getByLabel("Judul laporan",{exact:true}).fill("Laporan jaringan PUSDATIN");
   const download=page.waitForEvent("download");
   await page.getByRole("button",{name:"Ekspor PDF (2 metrik)"}).click();
   expect((await download).suggestedFilename()).toBe("Test_host_2026-03-18_a1b2c3d4.pdf");
   expect(state.generated().item_ids).toEqual(["10","11"]);
   expect(state.generated().zabbix_server).toBe("primary");
   expect(state.generated().resolution).toBe("minute");
+  expect(state.generated().title).toBe("Laporan jaringan PUSDATIN");
   await expect(page.getByRole("status")).toContainText("sebagian data");
   await expect(page.getByText("Memory: Tidak ada data.",{exact:true})).toBeVisible();
   await page.screenshot({path:test.info().outputPath("dashboard.png"),fullPage:true});
@@ -150,6 +251,7 @@ test("dashboard previews constant data and exports several metrics with partial 
 test("PDF download preserves Unicode host names from encoded filenames",async({page})=>{
   await mockAPI(page,"attachment; filename*=utf-8''Branch_Caf%C3%A9_2026-03-18_a1b2c3d4.pdf");
   await page.goto("/");
+  await page.getByLabel("Judul laporan",{exact:true}).fill("Branch network report");
   await page.getByRole("combobox",{name:"Host",exact:true}).selectOption("1");
   await page.getByRole("checkbox",{name:"CPU"}).check();
   const download=page.waitForEvent("download");
@@ -159,6 +261,7 @@ test("PDF download preserves Unicode host names from encoded filenames",async({p
 
 test("daily minute chart covers midnight through the final minute and exports one full day",async({page})=>{
   const state=await mockAPI(page);await page.goto("/");
+  await page.getByLabel("Judul laporan",{exact:true}).fill("Daily network report");
   await page.getByLabel("Tanggal laporan",{exact:true}).fill("2026-03-18");
   await expect(page.getByLabel("Mulai",{exact:true})).toHaveValue("2026-03-18T00:00");
   await expect(page.getByLabel("Selesai",{exact:true})).toHaveValue("2026-03-18T23:59");
@@ -183,6 +286,7 @@ test("daily minute chart covers midnight through the final minute and exports on
 
 test("monthly report exports March 18 through 31 in one PDF with daily previews",async({page})=>{
   const state=await mockAPI(page);await page.goto("/");
+  await page.getByLabel("Judul laporan",{exact:true}).fill("March network report");
   await page.getByRole("combobox",{name:"Host",exact:true}).selectOption("1");
   await page.getByRole("checkbox",{name:"CPU"}).check();
   await page.getByRole("combobox",{name:"Periode laporan",exact:true}).selectOption("monthly");
@@ -214,6 +318,7 @@ test("monthly report exports March 18 through 31 in one PDF with daily previews"
 
 test("monthly range rejects reversed dates and handles February including leap years",async({page})=>{
   const state=await mockAPI(page);await page.goto("/");
+  await page.getByLabel("Judul laporan",{exact:true}).fill("Monthly network report");
   await page.getByRole("combobox",{name:"Host",exact:true}).selectOption("1");
   await page.getByRole("checkbox",{name:"CPU"}).check();
   await page.getByRole("combobox",{name:"Periode laporan",exact:true}).selectOption("monthly");
@@ -270,6 +375,7 @@ test("downtime displays start recovery and duration and includes the selected tr
   expect(requestServer).toBe("secondary");
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
   await page.locator(".downtime-card").screenshot({path:test.info().outputPath("host-downtime.png")});
+  await page.getByLabel("Judul laporan",{exact:true}).fill("Host downtime report");
   let download=page.waitForEvent("download");
   await page.getByRole("button",{name:"Ekspor PDF (1 metrik)"}).click();await download;
   expect(state.generated().include_downtime).toBe(true);
