@@ -20,10 +20,14 @@ def row_to_dict(row):
 
 async def validate(payload):
     try:
-        host = await ZabbixClient().validate_selection(payload.host_id, payload.host_name, payload.item_ids)
+        host = await ZabbixClient(payload.zabbix_server).validate_selection(
+            payload.host_id, payload.host_name, payload.item_ids,
+        )
         return host["hostid"], host["name"] or host["host"]
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc))
     except Exception:
         raise HTTPException(502, "Validasi metrik Zabbix gagal. Periksa koneksi API.")
 
@@ -38,9 +42,10 @@ async def list_schedules():
 async def create_schedule(payload: ScheduleCreate):
     host_id, host_name = await validate(payload)
     row = await get_pool().fetchrow("""
-        INSERT INTO report_schedules (name, host_id, host_name, item_ids, hour, minute, timezone, enabled)
-        VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8) RETURNING *
-    """, payload.name, host_id, host_name, json.dumps(payload.item_ids), payload.hour,
+        INSERT INTO report_schedules
+            (name, host_id, zabbix_server, host_name, item_ids, hour, minute, timezone, enabled)
+        VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9) RETURNING *
+    """, payload.name, host_id, payload.zabbix_server, host_name, json.dumps(payload.item_ids), payload.hour,
         payload.minute, payload.timezone, payload.enabled)
     return {"success": True, "data": row_to_dict(row)}
 
@@ -63,10 +68,10 @@ async def update_schedule(schedule_id: int, payload: ScheduleUpdate):
     async with get_pool().acquire() as conn, conn.transaction():
         await lock_schedule(conn, schedule_id)
         row = await conn.fetchrow("""
-            UPDATE report_schedules SET name=$1,host_id=$2,host_name=$3,item_ids=$4::jsonb,
-                hour=$5,minute=$6,timezone=$7,enabled=$8,next_retry_at=NULL,last_error=NULL,
-                updated_at=NOW() WHERE id=$9 RETURNING *
-        """, payload.name, host_id, host_name, json.dumps(payload.item_ids), payload.hour,
+            UPDATE report_schedules SET name=$1,host_id=$2,zabbix_server=$3,host_name=$4,
+                item_ids=$5::jsonb,hour=$6,minute=$7,timezone=$8,enabled=$9,
+                next_retry_at=NULL,last_error=NULL,updated_at=NOW() WHERE id=$10 RETURNING *
+        """, payload.name, host_id, payload.zabbix_server, host_name, json.dumps(payload.item_ids), payload.hour,
             payload.minute, payload.timezone, payload.enabled, schedule_id)
     return {"success": True, "data": row_to_dict(row)}
 

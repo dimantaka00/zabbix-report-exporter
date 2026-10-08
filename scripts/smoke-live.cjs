@@ -36,7 +36,7 @@ async function main(){
     if(pdf.subarray(0,5).toString()!=="%PDF-" || !pdf.toString().includes("%%EOF"))
       throw new Error("PDF tidak lengkap.");
     const pages=(pdf.toString().match(/\/Type\s*\/Page\b/g)||[]).length;
-    if(pages!==3)throw new Error("Expected cover and 2 metric pages, got "+pages);
+    if(pages<3)throw new Error("Expected one PDF with a cover and both metric sections, got "+pages+" page(s).");
     await page.getByRole("status").filter({hasText:"sebagian data"}).waitFor();
     const history=await (await context.request.get(baseURL+"/api/v1/history?limit=1")).json();
     if(history.data[0].status!=="PARTIAL" || history.data[0].report_filename!==filename ||

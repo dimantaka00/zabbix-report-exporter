@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
@@ -11,6 +11,7 @@ Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max
 
 class MetricSelection(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    zabbix_server: Literal["primary", "secondary"] = "primary"
     host_id: Identifier | None = None
     host_name: Name
     item_ids: list[Identifier] = Field(min_length=1, max_length=settings.MAX_REPORT_ITEMS)
@@ -41,8 +42,11 @@ class ScheduleCreate(MetricSelection):
 
 
 class GenerateReportRequest(MetricSelection):
+    include_downtime: bool = True
+    downtime_trigger_id: Identifier | None = None
     time_from: int = Field(ge=0)
     time_till: int = Field(ge=0)
+    resolution: Literal["auto", "hourly", "minute"] = "minute"
     title: Name = "ZABBIX MONITORING REPORT"
     timezone: str = "Asia/Jakarta"
 

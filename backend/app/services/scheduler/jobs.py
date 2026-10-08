@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from datetime import datetime, timedelta
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
@@ -9,6 +10,7 @@ from starlette.concurrency import run_in_threadpool
 from app.core.config import settings
 from app.core.database import decode_item_ids, get_pool
 from app.services.report.data import collect_items
+from app.services.report.downtime import collect_host_downtime
 from app.services.report.pdf import generate_multi_item_pdf
 from app.services.zabbix.client import ZabbixClient
 
@@ -58,13 +60,20 @@ async def _execute(conn, schedule, force):
         day = (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
         start, end = int(day.timestamp()), int((day + timedelta(days=1)).timestamp()) - 1
         async with asyncio.timeout(settings.REPORT_TIMEOUT_SECONDS):
-            data = await collect_items(ZabbixClient(), decode_item_ids(schedule["item_ids"]), start, end)
-            if not any(d["points"] for d in data):
+            client = ZabbixClient(schedule["zabbix_server"])
+            data = await collect_items(
+                client,
+                decode_item_ids(schedule["item_ids"]), start, end, "minute",
+            )
+            downtime = await collect_host_downtime(client, schedule["host_id"], schedule["host_name"], start, end)
+            if not any(d["points"] for d in data) and not downtime.get("events"):
                 raise ValueError("Tidak ada data untuk periode laporan. Periksa metrik atau pilih periode lain.")
             warnings = [f"{d['item']['name']}: {d['warning']}" for d in data if d.get("warning")]
+            if downtime.get("warning"):
+                warnings.append(f"Downtime: {downtime['warning']}")
             output = await run_in_threadpool(
                 generate_multi_item_pdf, schedule["host_name"], data, start, end,
-                schedule["name"], schedule["timezone"],
+                schedule["name"], schedule["timezone"], downtime,
             )
         status = "PARTIAL" if warnings else "SUCCESS"
         warning = "; ".join(warnings) or None
@@ -79,7 +88,7 @@ async def _execute(conn, schedule, force):
             """, status, output.name, warning, execution_id)
         logger.info("Schedule %s %s: %s", schedule["id"], status, output.name)
         return {"execution_id": execution_id, "status": status, "report_filename": output.name,
-                "download_url": f"/api/v1/reports/{output.name}", "warning": warning}
+                "download_url": f"/api/v1/reports/{quote(output.name)}", "warning": warning}
     except Exception as exc:
         message = str(exc) if isinstance(exc, ValueError) else "Pembuatan laporan gagal. Periksa koneksi Zabbix dan log layanan."
         logger.exception("Schedule %s failed", schedule["id"])

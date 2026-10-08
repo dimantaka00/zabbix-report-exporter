@@ -1,5 +1,6 @@
 import asyncio
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -9,6 +10,7 @@ from app.core.config import settings
 from app.core.database import get_pool
 from app.models.requests import GenerateReportRequest
 from app.services.report.data import collect_items
+from app.services.report.downtime import collect_host_downtime
 from app.services.report.pdf import REPORT_DIR, generate_multi_item_pdf
 from app.services.zabbix.client import ZabbixClient
 
@@ -23,17 +25,19 @@ async def list_reports(offset: int = Query(0, ge=0), limit: int = Query(100, ge=
     for file in files[offset:offset + limit]:
         stat = file.stat()
         rows.append({"filename": file.name, "size": stat.st_size, "created": stat.st_mtime,
-                     "download_url": f"/api/v1/reports/{file.name}"})
+                     "download_url": f"/api/v1/reports/{quote(file.name)}"})
     return {"success": True, "data": rows, "total": len(files)}
 
 
 @router.post("/generate")
 async def generate_report(payload: GenerateReportRequest):
     try:
-        client = ZabbixClient()
+        client = ZabbixClient(payload.zabbix_server)
         host = await client.validate_selection(payload.host_id, payload.host_name, payload.item_ids)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc))
     except Exception:
         raise HTTPException(502, "Koneksi Zabbix belum tersedia.")
     pool = get_pool()
@@ -43,12 +47,16 @@ async def generate_report(payload: GenerateReportRequest):
     """, payload.title, host["name"] or host["host"])
     try:
         async with asyncio.timeout(settings.REPORT_TIMEOUT_SECONDS), generation_limit:
-            data = await collect_items(client, payload.item_ids, payload.time_from, payload.time_till)
-            if not any(item["points"] for item in data):
+            data = await collect_items(client, payload.item_ids, payload.time_from, payload.time_till, payload.resolution)
+            downtime = await collect_host_downtime(client, host["hostid"], payload.host_name,
+                payload.time_from, payload.time_till, payload.downtime_trigger_id) if payload.include_downtime else None
+            if not any(item["points"] for item in data) and not (downtime and downtime.get("events")):
                 raise ValueError("Tidak ada data untuk periode laporan. Pilih metrik atau periode lain.")
             warnings = [f"{d['item']['name']}: {d['warning']}" for d in data if d.get("warning")]
+            if downtime and downtime.get("warning"):
+                warnings.append(f"Downtime: {downtime['warning']}")
             path = await run_in_threadpool(generate_multi_item_pdf, host["name"] or host["host"],
-                data, payload.time_from, payload.time_till, payload.title, payload.timezone)
+                data, payload.time_from, payload.time_till, payload.title, payload.timezone, downtime)
         status = "PARTIAL" if warnings else "SUCCESS"
         await pool.execute("""
             UPDATE report_execution_logs SET finished_at=NOW(),status=$1,

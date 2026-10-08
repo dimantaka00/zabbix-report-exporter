@@ -64,6 +64,7 @@ async def dashboard_status():
         "postgresql": "error",
         "redis": "error",
         "zabbix": "error",
+        "zabbix_secondary": "not_configured",
         "scheduler": "unknown",
     }
 
@@ -100,17 +101,17 @@ async def dashboard_status():
     except Exception:
         status["redis"] = "error"
 
-    # Zabbix
-    try:
-        client = ZabbixClient()
-
-        result = await client.get_hosts()
-
-        if result is not None:
-            status["zabbix"] = "connected"
-
-    except Exception:
-        status["zabbix"] = "error"
+    for server in ZabbixClient.configured_servers():
+        key = "zabbix" if server["id"] == "primary" else "zabbix_secondary"
+        if not server["configured"]:
+            status[key] = "not_configured"
+            continue
+        try:
+            result = await ZabbixClient(server["id"]).get_hosts()
+            if result is not None:
+                status[key] = "connected"
+        except Exception:
+            status[key] = "error"
 
     return {
         "success": True,

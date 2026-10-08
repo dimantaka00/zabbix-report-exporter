@@ -20,6 +20,7 @@ async def init_db():
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS report_schedules (
                     id SERIAL PRIMARY KEY, name TEXT NOT NULL, host_id TEXT,
+                    zabbix_server TEXT NOT NULL DEFAULT 'primary',
                     host_name TEXT NOT NULL, item_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
                     hour SMALLINT NOT NULL CHECK (hour BETWEEN 0 AND 23),
                     minute SMALLINT NOT NULL CHECK (minute BETWEEN 0 AND 59),
@@ -36,6 +37,7 @@ async def init_db():
                 );
                 ALTER TABLE report_schedules ADD COLUMN IF NOT EXISTS next_retry_at TIMESTAMPTZ;
                 ALTER TABLE report_schedules ADD COLUMN IF NOT EXISTS last_error TEXT;
+                ALTER TABLE report_schedules ADD COLUMN IF NOT EXISTS zabbix_server TEXT NOT NULL DEFAULT 'primary';
                 ALTER TABLE report_execution_logs ADD COLUMN IF NOT EXISTS schedule_name TEXT;
                 ALTER TABLE report_execution_logs ADD COLUMN IF NOT EXISTS host_name TEXT;
                 ALTER TABLE report_execution_logs ADD COLUMN IF NOT EXISTS trigger_type TEXT DEFAULT 'scheduled';
