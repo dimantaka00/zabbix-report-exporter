@@ -1,9 +1,10 @@
 import asyncio
 from pathlib import Path
 from urllib.parse import quote
+from zipfile import BadZipFile, ZipFile
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
 from app.core.config import settings
@@ -13,6 +14,7 @@ from app.services.report.data import collect_items
 from app.services.report.downtime import collect_host_downtime
 from app.services.report.pdf import REPORT_DIR, generate_multi_item_pdf
 from app.services.zabbix.client import ZabbixClient
+from app.services.report.archive import report_path
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 generation_limit = asyncio.Semaphore(2)
@@ -20,13 +22,19 @@ generation_limit = asyncio.Semaphore(2)
 
 @router.get("")
 async def list_reports(offset: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200)):
-    files = sorted(REPORT_DIR.glob("*.pdf"), key=lambda p: p.stat().st_mtime, reverse=True)
+    ready = set(await get_pool().fetchval("SELECT COALESCE(array_agg(archive_filename),ARRAY[]::text[]) FROM report_auto_runs WHERE archive_status='READY'"))
     rows = []
-    for file in files[offset:offset + limit]:
-        stat = file.stat()
+    for file in [*REPORT_DIR.glob("*.pdf"), *[p for p in REPORT_DIR.glob("*.zip") if p.name in ready]]:
+        try:
+            if file.is_symlink():
+                continue
+            stat = file.stat()
+        except FileNotFoundError:
+            continue
         rows.append({"filename": file.name, "size": stat.st_size, "created": stat.st_mtime,
                      "download_url": f"/api/v1/reports/{quote(file.name)}"})
-    return {"success": True, "data": rows, "total": len(files)}
+    rows.sort(key=lambda row:row["created"],reverse=True)
+    return {"success": True, "data": rows[offset:offset+limit], "total": len(rows)}
 
 
 @router.post("/generate")
@@ -56,7 +64,8 @@ async def generate_report(payload: GenerateReportRequest):
             if downtime and downtime.get("warning"):
                 warnings.append(f"Downtime: {downtime['warning']}")
             path = await run_in_threadpool(generate_multi_item_pdf, host["name"] or host["host"],
-                data, payload.time_from, payload.time_till, payload.title, payload.timezone, downtime)
+                data, payload.time_from, payload.time_till, payload.title, payload.timezone, downtime,
+                chart_mode=payload.chart_mode)
         status = "PARTIAL" if warnings else "SUCCESS"
         await pool.execute("""
             UPDATE report_execution_logs SET finished_at=NOW(),status=$1,
@@ -75,8 +84,41 @@ async def generate_report(payload: GenerateReportRequest):
 @router.get("/{filename}")
 async def download_report(filename: str):
     path = (REPORT_DIR / filename).resolve()
-    if path.parent != REPORT_DIR.resolve() or path.suffix.lower() != ".pdf":
+    if path.parent != REPORT_DIR.resolve() or path.suffix.lower() not in (".pdf",".zip") or '\\' in filename or '/' in filename or (REPORT_DIR/filename).is_symlink():
         raise HTTPException(400, "Nama file tidak valid.")
     if not path.is_file():
+        if path.suffix.lower() == ".pdf":
+            archive = await get_pool().fetchval("""SELECT h.archive_filename FROM report_execution_logs h
+                JOIN report_auto_runs r ON r.archive_filename=h.archive_filename AND r.archive_status='READY'
+                WHERE h.report_filename=$1 LIMIT 1""",filename)
+            if archive:
+                return await download_member(archive,filename)
         raise HTTPException(404, "Laporan tidak ditemukan.")
-    return FileResponse(str(path), media_type="application/pdf", filename=path.name)
+    if path.suffix.lower() == ".zip" and not await get_pool().fetchval("SELECT EXISTS(SELECT 1 FROM report_auto_runs WHERE archive_filename=$1 AND archive_status='READY')",filename):
+        raise HTTPException(404,"Arsip belum tersedia.")
+    return FileResponse(str(path), media_type="application/zip" if path.suffix.lower()==".zip" else "application/pdf", filename=path.name)
+
+
+@router.get("/archives/{archive_name}/{filename}")
+async def download_member(archive_name: str, filename: str):
+    try:
+        path = report_path(archive_name,".zip")
+        report_path(filename,".pdf")
+    except ValueError as exc:
+        raise HTTPException(400,str(exc))
+    registered = await get_pool().fetchval("""SELECT EXISTS(SELECT 1 FROM report_execution_logs h
+        JOIN report_auto_runs r ON r.archive_filename=h.archive_filename AND r.archive_status='READY'
+        WHERE h.archive_filename=$1 AND h.report_filename=$2)""",archive_name,filename)
+    if not registered or not path.is_file():
+        raise HTTPException(404,"PDF dalam ZIP tidak ditemukan.")
+    try:
+        with ZipFile(path) as archive:
+            size = archive.getinfo(filename).file_size
+    except (BadZipFile,KeyError,OSError):
+        raise HTTPException(502,"Arsip PDF tidak dapat dibaca.")
+    def stream():
+        with ZipFile(path) as archive, archive.open(filename) as member:
+            while chunk := member.read(128*1024):
+                yield chunk
+    return StreamingResponse(stream(),media_type="application/pdf",headers={
+        "Content-Length":str(size),"Content-Disposition":f"attachment; filename*=UTF-8''{quote(filename)}"})

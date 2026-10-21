@@ -17,6 +17,7 @@ from app.core.config import settings
 from app.services.report.data import daily_data, summarize_points
 from app.services.report.units import bandwidth_number, display_unit, format_network_value, unit_group, is_bandwidth_unit
 from app.services.report.downtime import STATUS_LABELS, duration_text, duration_detail
+from app.services.report.combined import combined_scale, metric_colors
 
 REPORT_DIR = settings.REPORT_STORAGE
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
@@ -60,12 +61,13 @@ def daily_rows(data, time_from, time_till, timezone):
 
 
 class MetricChart(Flowable):
-    def __init__(self, data, timezone):
+    def __init__(self, data, timezone, series=None):
         super().__init__()
         self.data = data
         self.timezone = timezone
         self.width = CONTENT_WIDTH
         self.height = 295
+        self.series = series
 
     def draw(self):
         c = self.canv
@@ -75,6 +77,8 @@ class MetricChart(Flowable):
         span = max(last - first, 1)
         stats = self.data.get("summary") or summarize_points(points)
         low, high = (stats["minimum"], stats["maximum"]) if points else (0, 1)
+        if self.series:
+            low, high = min(low, 0), max(high, 0)
         if low == high:
             padding = max(abs(low) * 0.05, 1)
             low, high = low - padding, high + padding
@@ -108,6 +112,14 @@ class MetricChart(Flowable):
         if not points:
             c.drawCentredString(left + width / 2, bottom + height / 2, "No data for this day")
             return
+        series = self.series or [(self.data, "#2563eb", 0, 1)]
+        for metric, color, dash, multiplier in series:
+            self.draw_series(c, metric["points"], color, dash, multiplier,
+                             left, bottom, width, height, first, span, low, high)
+
+    def draw_series(self, c, points, color, dash, multiplier, left, bottom, width, height, first, span, low, high):
+        if not points:
+            return
         plotted = points
         if len(points) > 2000:
             plotted = [points[0]]
@@ -117,20 +129,22 @@ class MetricChart(Flowable):
                 extrema = [min(bucket, key=lambda p: p["value"]), max(bucket, key=lambda p: p["value"])]
                 plotted.extend(sorted(extrema, key=lambda p: p["timestamp"]))
             plotted.append(points[-1])
-        c.setStrokeColor(colors.HexColor("#93c5fd"))
+        c.saveState()
+        c.setStrokeColor(colors.HexColor(color))
         c.setLineWidth(0.5)
         for point in plotted:
             if point.get("min", point["value"]) != point.get("max", point["value"]):
                 x = left + (point["timestamp"] - first) / span * width
-                c.line(x, bottom + (point["min"] - low) / (high - low) * height,
-                       x, bottom + (point["max"] - low) / (high - low) * height)
-        c.setStrokeColor(colors.HexColor("#2563eb"))
-        c.setFillColor(colors.HexColor("#2563eb"))
-        c.setLineWidth(0.8)
+                c.line(x, bottom + (point["min"] * multiplier - low) / (high - low) * height,
+                       x, bottom + (point["max"] * multiplier - low) / (high - low) * height)
+        c.setStrokeColor(colors.HexColor(color))
+        c.setFillColor(colors.HexColor(color))
+        c.setLineWidth(1 if self.series else 0.8)
+        c.setDash(*((4, 2) if dash == 1 else (1, 2) if dash == 2 else ()))
         path = c.beginPath()
         for index, point in enumerate(plotted):
             x = left + (point["timestamp"] - first) / span * width
-            y = bottom + (point["value"] - low) / (high - low) * height
+            y = bottom + (point["value"] * multiplier - low) / (high - low) * height
             if index:
                 path.lineTo(x, y)
             else:
@@ -138,6 +152,17 @@ class MetricChart(Flowable):
             if len(points) == 1:
                 c.circle(x, y, 2.5, fill=1, stroke=0)
         c.drawPath(path)
+        c.restoreState()
+
+
+def combined_chart(days, timezone):
+    unit, multipliers = combined_scale(days)
+    styles = metric_colors([day["item"] for day in days])
+    points = [{**point, **{key: point[key] * multiplier for key in ("value", "min", "max") if key in point}}
+              for day, multiplier in zip(days, multipliers) for point in day["points"]]
+    common = {**days[0], "item": {"units": unit}, "points": points, "summary": summarize_points(points)}
+    return MetricChart(common, timezone, series=[(day, color, dash, multiplier)
+                       for day, (color, dash), multiplier in zip(days, styles, multipliers)])
 
 
 def table_style():
@@ -153,7 +178,14 @@ def table_style():
 
 
 def generate_multi_item_pdf(host_name, item_data_list, time_from, time_till,
-                            title="ZABBIX MONITORING REPORT", timezone=None, downtime=None) -> Path:
+                            title="ZABBIX MONITORING REPORT", timezone=None, downtime=None,
+                            chart_mode="separate") -> Path:
+    if chart_mode not in ("separate", "combined"):
+        raise ValueError("Mode grafik tidak valid.")
+    if chart_mode == "combined":
+        if len(item_data_list) < 2:
+            raise ValueError("Pilih minimal dua metrik untuk grafik gabungan.")
+        combined_scale(item_data_list)
     tz = ZoneInfo(timezone or settings.TIMEZONE)
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     output = REPORT_DIR / report_filename(host_name, time_from, time_till, tz)
@@ -187,6 +219,38 @@ def generate_multi_item_pdf(host_name, item_data_list, time_from, time_till,
     section = 0
     daily_series = [daily_data(data, time_from, time_till, tz) for data in item_data_list]
     for day_index in range(len(daily_series[0]) if daily_series else 0):
+        if chart_mode == "combined":
+            days = [metric_days[day_index] for metric_days in daily_series]
+            if section:
+                story.append(PageBreak())
+            section += 1
+            story.append(Paragraph(f"Date {days[0]['date']}", styles["Heading2"]))
+            story.append(Paragraph("Combined metrics", styles["Heading2"]))
+            unit, multipliers = combined_scale(days)
+            peak = max((abs(point.get("max", point["value"])) * multiplier
+                        for day, multiplier in zip(days, multipliers) for point in day["points"]), default=0)
+            _, chart_label = display_unit(unit, peak)
+            story.append(Paragraph(f"00:00 - 23:59 | Chart unit: {text(chart_label or '-')} | "
+                                   f"{text({'minute': 'Per minute', 'hourly': 'Per hour', 'auto': 'Automatic'}.get(days[0].get('resolution'), 'Per minute'))}", styles["BodyText"]))
+            # The colored metric labels are the compact legend; no duplicated Included metrics section.
+            for day, (color, dash) in zip(days, metric_colors([day["item"] for day in days])):
+                line_style = ("solid", "dashed", "dotted")[dash]
+                story.append(Paragraph(f'<font color="{color}"><b>{text(day["item"]["name"])}</b></font> '
+                    f'({line_style}; {text(day["source"])})', styles["BodyText"]))
+                if day.get("warning"):
+                    story.append(Paragraph(f'<b>Note:</b> {text(day["warning"])}', styles["BodyText"]))
+            story.extend([Spacer(1, 4), combined_chart(days, tz), Spacer(1, 4)])
+            rows = []
+            for day, (color, _) in zip(days, metric_colors([day["item"] for day in days])):
+                row = daily_rows(day, day["time_from"], day["time_till"], tz)[0]
+                row[0] = Paragraph(f'<font color="{color}">{text(day["item"]["name"])}</font>', styles["BodyText"])
+                rows.append(row)
+            parameter = "Interface Parameter" if all(is_bandwidth_unit(day["item"].get("units")) for day in days) else "Parameter"
+            summary = Table([[parameter, "Last", "Min", "Average", "Max"], *rows], repeatRows=1,
+                            colWidths=[CONTENT_WIDTH * fraction for fraction in (.32, .17, .17, .17, .17)])
+            summary.setStyle(table_style())
+            story.append(summary)
+            continue
         for metric_days in daily_series:
             day = metric_days[day_index]
             if section:

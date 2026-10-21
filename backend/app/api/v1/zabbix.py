@@ -1,7 +1,8 @@
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from app.core.config import settings
+from app.models.requests import Identifier
 from app.services.zabbix.client import ZabbixClient
 
 router = APIRouter(prefix="/zabbix", tags=["Zabbix"])
@@ -38,8 +39,8 @@ async def servers():
 
 
 @router.get("/hosts")
-async def hosts(server_id: str = Query("primary")):
-    return {"success": True, "data": await request(server_id, "get_hosts")}
+async def hosts(server_id: str = Query("primary"), group_ids: Annotated[list[Identifier] | None, Query(max_length=200)] = None):
+    return {"success": True, "data": await request(server_id, "get_hosts", group_ids) if group_ids else await request(server_id, "get_hosts")}
 
 
 @router.get("/hosts/by-name/{host_name}/items")
@@ -51,6 +52,11 @@ async def items_by_host_name(host_name: str, server_id: str = Query("primary")):
 @router.get("/hosts/{hostid}/items")
 async def items(hostid: str, server_id: str = Query("primary")):
     return {"success": True, "hostid": hostid, "data": await request(server_id, "get_items", hostid)}
+
+
+@router.get("/hosts/{hostid}/details")
+async def host_details(hostid: str, server_id: str = Query("primary")):
+    return {"success": True, "data": await request(server_id, "get_host_details", hostid)}
 
 
 @router.get("/hosts/{hostid}/graphs")

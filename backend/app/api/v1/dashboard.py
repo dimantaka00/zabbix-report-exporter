@@ -1,3 +1,4 @@
+import asyncio
 import os
 
 from fastapi import APIRouter
@@ -15,6 +16,7 @@ router = APIRouter(
 
 
 REPORT_DIR = settings.REPORT_STORAGE
+STATUS_CHECK_TIMEOUT = 10
 
 
 @router.get("/summary")
@@ -23,16 +25,15 @@ async def dashboard_summary():
 
     total_schedules = await pool.fetchval(
         """
-        SELECT COUNT(*)
-        FROM report_schedules;
+        SELECT (SELECT COUNT(*) FROM report_schedules)
+             + (SELECT COUNT(*) FROM report_auto_schedules);
         """
     )
 
     active_schedules = await pool.fetchval(
         """
-        SELECT COUNT(*)
-        FROM report_schedules
-        WHERE enabled = TRUE;
+        SELECT (SELECT COUNT(*) FROM report_schedules WHERE enabled=TRUE)
+             + (SELECT COUNT(*) FROM report_auto_schedules WHERE enabled=TRUE);
         """
     )
 
@@ -43,7 +44,7 @@ async def dashboard_summary():
             [
                 file
                 for file in os.listdir(REPORT_DIR)
-                if file.lower().endswith(".pdf")
+                if file.lower().endswith((".pdf", ".zip"))
             ]
         )
 
@@ -68,24 +69,15 @@ async def dashboard_status():
         "scheduler": "unknown",
     }
 
-    # PostgreSQL
-    try:
-        pool = get_pool()
+    async def check_postgresql():
+        try:
+            await asyncio.wait_for(get_pool().fetchval("SELECT 1;"), STATUS_CHECK_TIMEOUT)
+            status["postgresql"] = "connected"
+        except Exception:
+            status["postgresql"] = "error"
 
-        await pool.fetchval(
-            "SELECT 1;"
-        )
-
-        status["postgresql"] = "connected"
-
-    except Exception:
-        status["postgresql"] = "error"
-
-    # Redis
-    try:
-        redis_url = settings.REDIS_URL
-
-        if redis_url:
+    async def redis_status():
+        if settings.REDIS_URL:
             client = create_redis_client()
             try:
                 await client.ping()
@@ -98,20 +90,31 @@ async def dashboard_status():
             finally:
                 await client.aclose()
 
-    except Exception:
-        status["redis"] = "error"
+    async def check_redis():
+        try:
+            await asyncio.wait_for(redis_status(), STATUS_CHECK_TIMEOUT)
+        except Exception:
+            status["redis"] = "error"
+            status["scheduler"] = "unknown"
 
-    for server in ZabbixClient.configured_servers():
+    async def check_zabbix(server):
         key = "zabbix" if server["id"] == "primary" else "zabbix_secondary"
         if not server["configured"]:
             status[key] = "not_configured"
-            continue
+            return
         try:
-            result = await ZabbixClient(server["id"]).get_hosts()
-            if result is not None:
+            connected = await asyncio.wait_for(
+                ZabbixClient(server["id"]).check_connection(), STATUS_CHECK_TIMEOUT,
+            )
+            if connected:
                 status[key] = "connected"
         except Exception:
             status[key] = "error"
+
+    await asyncio.gather(
+        check_postgresql(), check_redis(),
+        *(check_zabbix(server) for server in ZabbixClient.configured_servers()),
+    )
 
     return {
         "success": True,

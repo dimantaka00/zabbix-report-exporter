@@ -1,0 +1,142 @@
+{
+    "checked_at":  "2026-10-13T10:50:08.8596289+07:00",
+    "backend":  {
+                    "status":  "passed",
+                    "database":  "disposable",
+                    "tests":  166
+                },
+    "browser":  {
+                    "status":  "passed",
+                    "tests":  78,
+                    "viewports":  [
+                                      "desktop",
+                                      "mobile"
+                                  ]
+                },
+    "windows":  {
+                    "metrics_and_downtime_same_window":  true,
+                    "end_minute_inclusive":  true,
+                    "default_start":  "00:00",
+                    "default_end":  "23:59",
+                    "existing_run_window_preserved_on_edit":  true
+                },
+    "dates":  {
+                  "expired_new_periods_blocked":  true,
+                  "basis":  "inclusive daily execution dates in policy timezone",
+                  "optional":  true,
+                  "bounded_existing_catchup":  true
+              },
+    "groups":  {
+                   "sources_without_selected_groups_skipped":  true,
+                   "CS":  "COMNET only",
+                   "basis":  "actual Zabbix group membership by source and group ID",
+                   "MILES":  "MILES",
+                   "TLK":  [
+                               "TLK",
+                               "TELKOM"
+                           ],
+                   "HYP":  [
+                               "HYP",
+                               "HYPERNET"
+                           ],
+                   "ICON":  "ICON",
+                   "missing_groups_defer_execution":  true
+               },
+    "deployment":  {
+                       "checked_at":  "2026-10-13T10:46:47.9656022+07:00",
+                       "local_only":  true,
+                       "authentication_enabled":  false,
+                       "existing_policy_settings_preserved":  true,
+                       "automatic_policies_before":  2,
+                       "automatic_policies_after":  2,
+                       "pages":  {
+                                     "/schedules":  200,
+                                     "/":  200,
+                                     "/api/v1/reports":  200,
+                                     "/reports":  200
+                                 }
+                   },
+    "live":  {
+                 "checked_at":  "2026-10-13T03:48:19.008Z",
+                 "authentication_enabled":  false,
+                 "automatic_policies_before":  2,
+                 "automatic_policies_after":  2,
+                 "existing_schedules_preserved":  true,
+                 "draft_saved_edited_removed":  true,
+                 "draft_enabled":  false,
+                 "cs_groups":  [
+                                   {
+                                       "source":  "primary",
+                                       "name":  "Balai Internet Comnet",
+                                       "id":  "59"
+                                   },
+                                   {
+                                       "source":  "primary",
+                                       "name":  "Comnet Balai",
+                                       "id":  "295"
+                                   },
+                                   {
+                                       "source":  "primary",
+                                       "name":  "COMNET-MTIX-SR",
+                                       "id":  "285"
+                                   },
+                                   {
+                                       "source":  "primary",
+                                       "name":  "COMNET-UPS-SR",
+                                       "id":  "261"
+                                   },
+                                   {
+                                       "source":  "primary",
+                                       "name":  "DC-Internet Comnet",
+                                       "id":  "81"
+                                   },
+                                   {
+                                       "source":  "secondary",
+                                       "name":  "Balai Internet Comnet",
+                                       "id":  "59"
+                                   },
+                                   {
+                                       "source":  "secondary",
+                                       "name":  "DC-Internet Comnet",
+                                       "id":  "81"
+                                   },
+                                   {
+                                       "source":  "secondary",
+                                       "name":  "Sekretariat PKH Comnet",
+                                       "id":  "149"
+                                   }
+                               ],
+                 "category_counts":  {
+                                         "CS":  8,
+                                         "TLK":  10,
+                                         "ICON":  5,
+                                         "HYP":  10,
+                                         "MILES":  10
+                                     },
+                 "live_browser":  [
+                                      {
+                                          "viewport":  "desktop",
+                                          "overflow":  false,
+                                          "runtime_errors":  [
+
+                                                             ]
+                                      },
+                                      {
+                                          "viewport":  "mobile",
+                                          "overflow":  false,
+                                          "runtime_errors":  [
+
+                                                             ]
+                                      }
+                                  ]
+             },
+    "backup_checks":  {
+                          "verification_index":  "hash table, count and SHA-256 per entry",
+                          "daily_report_zip_compression":  "DEFLATE 9 unchanged",
+                          "source_fixture":  "passed",
+                          "local_report_compression":  "Fastest without changing file content",
+                          "restore_readiness":  "TCP readiness excludes the transient Unix-socket-only initialization server",
+                          "restore_retry":  "passed against the same archive that initially hit the startup race",
+                          "restore_retry_checked_at":  "2026-10-13T11:06:32.6594998+07:00"
+                      }
+}

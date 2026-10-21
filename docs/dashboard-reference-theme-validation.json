@@ -1,0 +1,55 @@
+{
+  "checked_at": "2026-10-09T02:50:37.911Z",
+  "theme": "Dark purple with cyan and mint accents",
+  "views": [
+    {
+      "name": "desktop",
+      "theme": "dark",
+      "background": "rgb(23, 23, 35)",
+      "text": "rgb(241, 241, 250)",
+      "stroke": "rgb(56, 189, 248)",
+      "page": 1440,
+      "viewport": 1440,
+      "sidebar": "fixed",
+      "light_preference_persisted": true,
+      "routes": [
+        "/",
+        "/schedules",
+        "/reports"
+      ]
+    },
+    {
+      "name": "tablet",
+      "theme": "dark",
+      "background": "rgb(23, 23, 35)",
+      "text": "rgb(241, 241, 250)",
+      "stroke": "rgb(56, 189, 248)",
+      "page": 820,
+      "viewport": 820,
+      "sidebar": "static",
+      "light_preference_persisted": true,
+      "routes": [
+        "/",
+        "/schedules",
+        "/reports"
+      ]
+    },
+    {
+      "name": "mobile",
+      "theme": "dark",
+      "background": "rgb(23, 23, 35)",
+      "text": "rgb(241, 241, 250)",
+      "stroke": "rgb(56, 189, 248)",
+      "page": 393,
+      "viewport": 393,
+      "sidebar": "static",
+      "light_preference_persisted": true,
+      "routes": [
+        "/",
+        "/schedules",
+        "/reports"
+      ]
+    }
+  ],
+  "browser_errors": []
+}

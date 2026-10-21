@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import MetricPicker from "../../components/MetricPicker";
 import HostPicker from "../../components/HostPicker";
+import AutomaticSchedules from "../../components/AutomaticSchedules";
 import { api, numericItems, dateTime } from "../../lib/api";
 import type { Host, Item, Schedule, ZabbixServer } from "../../lib/api";
 
@@ -99,6 +100,7 @@ export default function SchedulesPage() {
   return <main><div className="page-heading"><div><p className="eyebrow">Otomasi laporan</p><h1>Jadwal laporan</h1><p className="muted">Laporan harian menggunakan data hari kalender sebelumnya.</p></div><button onClick={() => refresh().catch(e => setError(e.message))}>Refresh jadwal</button></div>
     {error&&<div className="alert error" role="alert">{error}</div>}
     {message&&<div className="alert success" role="status">{message}</div>}
+    <AutomaticSchedules servers={servers} />
     <section className="card"><h2>{editing===null ? "Buat jadwal harian" : `Edit jadwal #${editing}`}</h2>
       <form onSubmit={save}><div className="form-grid">
         <label><span>Nama laporan</span><input required maxLength={200} value={name} onChange={e => setName(e.target.value)} /></label>
@@ -123,7 +125,7 @@ export default function SchedulesPage() {
     <section className="card"><div className="card-heading"><h2>Jadwal tersimpan</h2><small>{schedules.length} jadwal</small></div>
       {loading ? <p role="status">Memuat jadwal…</p> : !schedules.length ? <p className="empty">Belum ada jadwal. Buat jadwal pertama di atas.</p> :
       <div className="table-wrap"><table><thead><tr><th>Laporan / host</th><th>Waktu</th><th>Status</th><th>Eksekusi terakhir</th><th>Aksi</th></tr></thead><tbody>
-        {schedules.map(s => <tr key={s.id}><td><strong>{s.name}</strong><small>{s.zabbix_server === "secondary" ? "Zabbix 2" : "Zabbix 1"} · {s.host_name} · {s.item_ids.length} metrik</small></td>
+        {schedules.map(s => <tr key={s.id}><td><strong>{s.name}</strong><small>{s.zabbix_server === "secondary" ? "Zabbix 2" : "Zabbix 7"} · {s.host_name} · {s.item_ids.length} metrik</small></td>
           <td className="nowrap">{String(s.hour).padStart(2,"0")}:{String(s.minute).padStart(2,"0")}<small>{s.timezone}</small></td>
           <td><span className={`badge ${s.enabled ? "success" : "disabled"}`}>{s.enabled ? "Aktif" : "Nonaktif"}</span>
             {s.last_error&&<small className="warning-text">{s.last_error}</small>}{s.next_retry_at&&<small>Retry {dateTime(s.next_retry_at)}</small>}</td>

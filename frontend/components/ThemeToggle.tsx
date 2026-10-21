@@ -1,18 +1,17 @@
 "use client";
 import {useEffect, useRef, useState} from "react";
-import {THEME_KEY, type Theme} from "../lib/theme";
+import {DEFAULT_THEME, THEME_KEY, type Theme} from "../lib/theme";
 import Icon from "./Icon";
 
 export default function ThemeToggle() {
-  const [theme,setTheme]=useState<Theme>("light");
+  const [theme,setTheme]=useState<Theme>(DEFAULT_THEME);
   const preference=useRef<Theme | null>(null);
   useEffect(()=>{
-    const system=window.matchMedia("(prefers-color-scheme: dark)");
     const sync=()=>{
       let stored:string | null=null;
       try {stored=localStorage.getItem(THEME_KEY);} catch { /* Keep the in-memory preference. */ }
       const selected=stored==="light" || stored==="dark" ? stored : preference.current;
-      const next=selected || (system.matches ? "dark" : "light");
+      const next=selected || DEFAULT_THEME;
       document.documentElement.dataset.theme=next;
       setTheme(next);
     };
@@ -23,9 +22,8 @@ export default function ThemeToggle() {
       }
     };
     sync();
-    system.addEventListener("change",sync);
     window.addEventListener("storage",onStorage);
-    return ()=>{system.removeEventListener("change",sync);window.removeEventListener("storage",onStorage);};
+    return ()=>window.removeEventListener("storage",onStorage);
   },[]);
   function toggle() {
     const next=document.documentElement.dataset.theme==="dark" ? "light" : "dark";

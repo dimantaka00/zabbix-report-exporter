@@ -1,0 +1,42 @@
+{
+  "checked_at": "2026-10-09T09:46:05.666Z",
+  "sources": [
+    {
+      "source": "primary",
+      "hostid": "16500",
+      "interfaces": 1,
+      "groups": 5,
+      "templates": 1,
+      "proxy_mode": "proxy",
+      "warnings": 0
+    },
+    {
+      "source": "secondary",
+      "hostid": "12947",
+      "interfaces": 2,
+      "groups": 2,
+      "templates": 1,
+      "proxy_mode": "server",
+      "warnings": 0
+    }
+  ],
+  "views": [
+    {
+      "label": "desktop",
+      "width": 1440,
+      "host_details": true,
+      "light_and_dark": true,
+      "source_switch": true,
+      "no_overflow": true
+    },
+    {
+      "label": "mobile",
+      "width": 393,
+      "host_details": true,
+      "light_and_dark": true,
+      "source_switch": true,
+      "no_overflow": true
+    }
+  ],
+  "browser_errors": []
+}

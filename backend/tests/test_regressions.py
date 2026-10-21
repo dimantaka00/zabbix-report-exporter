@@ -256,6 +256,22 @@ class ZabbixDataTests(unittest.IsolatedAsyncioTestCase):
         self.client=ZabbixClient.__new__(ZabbixClient)
         self.client.call=AsyncMock(side_effect=[[HOST],[ITEM]])
 
+    async def test_connection_probe_is_authenticated_and_limits_host_output(self):
+        self.client.call.side_effect = None
+        for rows in ([], [{"hostid": "1"}]):
+            self.client.call.return_value = rows
+            self.assertTrue(await self.client.check_connection())
+            self.client.call.assert_awaited_with("host.get", {"output": ["hostid"], "limit": 1})
+        self.client.call.side_effect = RuntimeError("Token denied")
+        with self.assertRaisesRegex(RuntimeError, "Token denied"):
+            await self.client.check_connection()
+
+    async def test_connection_probe_rejects_malformed_result(self):
+        self.client.call.side_effect = None
+        self.client.call.return_value = None
+        with self.assertRaisesRegex(RuntimeError, "tidak valid"):
+            await self.client.check_connection()
+
     async def test_metric_must_belong_to_host(self):
         self.client.call.side_effect=[[HOST],[{**ITEM,"hostid":"2"}]]
         with self.assertRaisesRegex(ValueError,"host"):
@@ -437,10 +453,10 @@ class ServiceStatusTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.pool = MagicMock(fetchval=AsyncMock(return_value=1))
         self.redis = MagicMock(ping=AsyncMock(), get=AsyncMock(), aclose=AsyncMock())
-        self.zabbix = MagicMock(get_hosts=AsyncMock(return_value=[]))
+        self.zabbix = MagicMock(check_connection=AsyncMock(return_value=True))
         zabbix_factory = MagicMock(return_value=self.zabbix)
         zabbix_factory.configured_servers.return_value = [
-            {"id":"primary","name":"Zabbix 1","configured":True},
+            {"id":"primary","name":"Zabbix 7","configured":True},
             {"id":"secondary","name":"Zabbix 2","configured":False},
         ]
         for target, value in (
@@ -472,6 +488,60 @@ class ServiceStatusTests(unittest.IsolatedAsyncioTestCase):
     async def test_redis_error_is_unknown_and_connection_is_closed(self):
         self.redis.ping.side_effect = RuntimeError("Redis unavailable")
         result = (await dashboard.dashboard_status())["data"]
+        self.assertEqual(result["redis"], "error")
+        self.assertEqual(result["scheduler"], "unknown")
+        self.redis.aclose.assert_awaited_once()
+
+    async def test_zabbix_servers_are_checked_concurrently(self):
+        dashboard.ZabbixClient.configured_servers.return_value[1]["configured"] = True
+        started = 0
+        both_started = asyncio.Event()
+
+        async def probe():
+            nonlocal started
+            started += 1
+            if started == 2:
+                both_started.set()
+            await both_started.wait()
+            return True
+
+        self.zabbix.check_connection.side_effect = probe
+        result = (await asyncio.wait_for(dashboard.dashboard_status(), timeout=1))["data"]
+        self.assertEqual(started, 2)
+        self.assertEqual(result["zabbix"], "connected")
+        self.assertEqual(result["zabbix_secondary"], "connected")
+        self.zabbix.get_hosts.assert_not_called()
+
+    async def test_slow_probe_is_cancelled_without_hiding_other_services(self):
+        cancelled = asyncio.Event()
+
+        async def slow_probe():
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+
+        self.zabbix.check_connection.side_effect = slow_probe
+        self.redis.get.return_value = "running"
+        with patch.object(dashboard, "STATUS_CHECK_TIMEOUT", 0.02):
+            result = (await dashboard.dashboard_status())["data"]
+        self.assertTrue(cancelled.is_set())
+        self.assertEqual(result["zabbix"], "error")
+        self.assertEqual(result["postgresql"], "connected")
+        self.assertEqual(result["redis"], "connected")
+        self.assertEqual(result["scheduler"], "running")
+
+    async def test_probe_error_does_not_report_zabbix_connected(self):
+        self.zabbix.check_connection.side_effect = RuntimeError("Token denied")
+        result = (await dashboard.dashboard_status())["data"]
+        self.assertEqual(result["zabbix"], "error")
+
+    async def test_redis_timeout_closes_connection_and_resets_worker_status(self):
+        async def slow_heartbeat(_):
+            await asyncio.Event().wait()
+        self.redis.get.side_effect = slow_heartbeat
+        with patch.object(dashboard, "STATUS_CHECK_TIMEOUT", 0.02):
+            result = (await dashboard.dashboard_status())["data"]
         self.assertEqual(result["redis"], "error")
         self.assertEqual(result["scheduler"], "unknown")
         self.redis.aclose.assert_awaited_once()
@@ -529,7 +599,7 @@ class RedisIntegrationTests(unittest.IsolatedAsyncioTestCase):
     async def test_live_heartbeat_and_expiry_are_visible_to_api(self):
         from app.services.scheduler.heartbeat import create_redis_client
         fake_pool = MagicMock(fetchval=AsyncMock(return_value=1))
-        fake_zabbix = MagicMock(get_hosts=AsyncMock(return_value=[]))
+        fake_zabbix = MagicMock(check_connection=AsyncMock(return_value=True))
         with patch.object(dashboard.settings, "REDIS_URL", os.environ["TEST_REDIS_URL"]), \
              patch.object(dashboard, "get_pool", return_value=fake_pool), \
              patch.object(dashboard, "ZabbixClient", return_value=fake_zabbix):
@@ -567,6 +637,13 @@ class DatabaseAndAPITests(unittest.IsolatedAsyncioTestCase):
         await database.init_db()
         self.pool=database.get_pool()
         await self.pool.execute("TRUNCATE report_execution_logs, report_schedules RESTART IDENTITY")
+        from app.services.access import token_hash
+        await self.pool.execute("TRUNCATE app_sessions, access_events, app_users RESTART IDENTITY CASCADE")
+        user_id=await self.pool.fetchval("""INSERT INTO app_users(username,display_name,password_hash,role,must_change_password)
+            VALUES('regression','Regression','unused','admin',FALSE) RETURNING id""")
+        await self.pool.execute("""INSERT INTO app_sessions(token_hash,user_id,csrf_token,ip,ip_kind,user_agent,expires_at)
+            VALUES($1,$2,'regression-csrf','127.0.0.1','internal','regression',NOW()+INTERVAL '1 hour')""",
+            token_hash('regression-session-token'),user_id)
         self.temp=tempfile.TemporaryDirectory()
         self.client=MagicMock(validate_selection=AsyncMock(return_value=HOST),
                               get_item_data=AsyncMock(return_value=DATA),
@@ -577,7 +654,8 @@ class DatabaseAndAPITests(unittest.IsolatedAsyncioTestCase):
         self.patches += [patch.object(module,"REPORT_DIR",Path(self.temp.name)) for module in (reports,pdf)]
         for p in self.patches:p.start()
         from app.main import app
-        self.http=httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url="http://test")
+        self.http=httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url="http://test",
+            cookies={"zabbix_session":"regression-session-token"},headers={"X-CSRF-Token":"regression-csrf"})
 
     async def asyncTearDown(self):
         await self.http.aclose()

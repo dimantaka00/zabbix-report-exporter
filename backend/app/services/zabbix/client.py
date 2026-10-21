@@ -16,7 +16,7 @@ ITEM_FIELDS = ["itemid", "hostid", "name", "key_", "value_type", "units",
 
 class ZabbixClient:
     SERVERS = {
-        "primary": ("Zabbix 1", "ZABBIX_URL", "ZABBIX_API_TOKEN"),
+        "primary": ("Zabbix 7", "ZABBIX_URL", "ZABBIX_API_TOKEN"),
         "secondary": ("Zabbix 2", "ZABBIX_SECONDARY_URL", "ZABBIX_SECONDARY_API_TOKEN"),
     }
 
@@ -83,12 +83,97 @@ class ZabbixClient:
             self._api_version = await self.call("apiinfo.version")
         return self._api_version
 
-    async def get_hosts(self):
-        return await self.call("host.get", {
+    async def check_connection(self):
+        # Authenticate without downloading the entire host inventory.
+        result = await self.call("host.get", {"output": ["hostid"], "limit": 1})
+        if not isinstance(result, list):
+            raise RuntimeError("Respons API Zabbix tidak valid.")
+        return True
+
+    async def get_host_groups(self):
+        return await self.call("hostgroup.get", {"output":["groupid","name"],"sortfield":"name","sortorder":"ASC"})
+
+    async def get_hosts(self, group_ids=None):
+        params = {
             "output": ["hostid", "host", "name", "status"],
             "selectInterfaces": ["interfaceid", "ip", "dns", "available"],
             "sortfield": "name", "sortorder": "ASC",
+        }
+        if group_ids:
+            params["groupids"] = list(group_ids)
+        return await self.call("host.get", params)
+
+    async def get_host_details(self, hostid):
+        hostid = str(hostid)
+        if not hostid.isascii() or not hostid.isdigit() or len(hostid) > 32:
+            raise ValueError("ID host tidak valid.")
+        try:
+            version = tuple(int(part) for part in (await self.api_version()).split(".")[:2])
+            if len(version) != 2:
+                raise ValueError()
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise RuntimeError("Versi API Zabbix tidak valid.") from exc
+        modern_proxy = version >= (7, 0)
+        group_selector = "selectHostGroups" if version >= (6, 2) else "selectGroups"
+        output = ["hostid", "host", "name", "status", "description"]
+        output += ["monitored_by", "proxyid", "proxy_groupid", "assigned_proxyid"] if modern_proxy else ["proxy_hostid"]
+        rows = await self.call("host.get", {
+            "hostids": [hostid], "output": output,
+            group_selector: ["groupid", "name"],
+            "selectParentTemplates": ["templateid", "name"],
+            "selectInterfaces": ["interfaceid", "type", "main", "ip", "dns", "useip", "port", "available", "details"],
         })
+        if len(rows) != 1 or str(rows[0].get("hostid")) != hostid:
+            raise ValueError("Host tidak ditemukan atau tidak dapat diakses.")
+        host = rows[0]
+        interfaces = []
+        for interface in host.get("interfaces", []):
+            safe = {key: str(interface.get(key, "")) for key in
+                    ("interfaceid", "type", "main", "ip", "dns", "useip", "port", "available")}
+            # Never forward community, passwords, secret macros, or raw SNMP details.
+            details = interface.get("details") or {}
+            safe["snmp"] = ({key: str(details.get(key, "")) for key in ("version", "bulk", "securitylevel")}
+                            if safe["type"] == "2" else None)
+            interfaces.append(safe)
+        warnings = []
+
+        async def lookup_name(method, id_field, record_id, name_field):
+            if not record_id or record_id == "0":
+                return None
+            try:
+                result = await self.call(method, {id_field + "s": [record_id], "output": [id_field, name_field]})
+                if len(result) == 1 and str(result[0].get(id_field)) == record_id:
+                    return result[0].get(name_field) or None
+            except Exception:
+                pass
+            warnings.append("Nama proxy/proxy group tidak tersedia. Periksa hak baca API; ID konfigurasi tetap ditampilkan.")
+            return None
+
+        proxy_id = str(host.get("proxyid" if modern_proxy else "proxy_hostid", "0"))
+        mode = str(host.get("monitored_by", "0")) if modern_proxy else ("1" if proxy_id != "0" else "0")
+        proxy = {"mode": "server", "id": None, "name": None, "assigned_proxy": None}
+        if mode == "1":
+            proxy.update(mode="proxy", id=proxy_id if proxy_id != "0" else None,
+                         name=await lookup_name("proxy.get", "proxyid", proxy_id, "name" if modern_proxy else "host"))
+        elif mode == "2":
+            group_id = str(host.get("proxy_groupid", "0"))
+            proxy.update(mode="proxy_group", id=group_id if group_id != "0" else None,
+                         name=await lookup_name("proxygroup.get", "proxy_groupid", group_id, "name"))
+            assigned_id = str(host.get("assigned_proxyid", "0"))
+            if assigned_id != "0":
+                proxy["assigned_proxy"] = {"id": assigned_id,
+                    "name": await lookup_name("proxy.get", "proxyid", assigned_id, "name")}
+        elif mode != "0":
+            proxy["mode"] = "unknown"
+        return {
+            **{key: str(host.get(key, "")) for key in ("hostid", "host", "name", "status", "description")},
+            "interfaces": interfaces,
+            "groups": [{"groupid": str(group["groupid"]), "name": group.get("name", "")}
+                       for group in host.get("hostgroups" if version >= (6, 2) else "groups", [])],
+            "templates": [{"templateid": str(template["templateid"]), "name": template.get("name", "")}
+                          for template in host.get("parentTemplates", [])],
+            "proxy": proxy, "warnings": list(dict.fromkeys(warnings)),
+        }
 
     async def get_host_by_name(self, host_name):
         rows = await self.call("host.get", {

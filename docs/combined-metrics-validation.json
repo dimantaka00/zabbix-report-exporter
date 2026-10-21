@@ -1,0 +1,39 @@
+{
+  "checked_at": "2026-10-09T10:08:49.760Z",
+  "hostid": "16057",
+  "item_ids": [
+    "782975",
+    "783044"
+  ],
+  "views": [
+    {
+      "label": "desktop",
+      "width": 1440,
+      "points": [
+        1432,
+        1433
+      ],
+      "received_green": true,
+      "sent_red": true,
+      "statistics_rows": 2,
+      "no_overflow": true
+    },
+    {
+      "label": "mobile",
+      "width": 393,
+      "points": [
+        1432,
+        1433
+      ],
+      "received_green": true,
+      "sent_red": true,
+      "statistics_rows": 2,
+      "no_overflow": true
+    }
+  ],
+  "browser_errors": [],
+  "pdf_download": {
+    "filename": "BBPPKS-BANJARMASIN-KALSEL-TLK-FORTI_2026-10-08_0642fdcf.pdf",
+    "success": true
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "date": "2026-10-12",
+  "timezone": "Asia/Jakarta",
+  "local_mode": {"AUTH_ENABLED": false, "base_url": "http://localhost:8080"},
+  "backend_tests_passed": 121,
+  "targeted_browser_tests_passed": 12,
+  "browser_coverage": ["desktop", "mobile", "disabled login navigation", "account/admin controls hidden", "login routes redirected", "enabled login retained", "theme retained when storage unavailable"],
+  "frontend_build": "passed including TypeScript",
+  "live_anonymous_access": {"/": 200, "/schedules": 200, "/reports": 200, "/api/v1/schedules": 200, "/api/v1/reports": 200, "/health/ready": 200},
+  "live_private_api": {"/api/v1/admin/users": 403, "/api/v1/admin/events": 403},
+  "live_browser": "monitoring, schedules, reports rendered without login on desktop/mobile; /login redirected to monitoring; no page errors",
+  "retained_database_rows": {"app_users": 1, "access_events": 2944, "report_schedules": 2, "report_execution_logs": 908},
+  "container_health": "backend, frontend, worker, PostgreSQL and Redis healthy; Nginx running",
+  "rollback_snapshot": "D:\\KERJAAN\\zabbix-report-exporter-backups\\20261012_131320_130fc5c3",
+  "rollback_snapshot_status": "verified; database restore passed",
+  "reactivation": "Set AUTH_ENABLED=true in local .env, recreate backend/worker with existing images, and reload the browser after migration. Default remains enabled."
+}

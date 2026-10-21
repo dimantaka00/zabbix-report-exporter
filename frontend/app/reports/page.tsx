@@ -25,14 +25,14 @@ export default function ReportsPage(){
     return <div className="pagination"><small>{count} hasil · halaman {current+1} dari {Math.max(Math.ceil(count/PAGE),1)}</small><div className="actions">
       <button disabled={loading||current===0} onClick={()=>change(current-1)}>Sebelumnya</button><button disabled={loading||(current+1)*PAGE>=count} onClick={()=>change(current+1)}>Berikutnya</button></div></div>;
   }
-  return <main><div className="page-heading"><div><p className="eyebrow">Arsip operasional</p><h1>Laporan & riwayat</h1><p className="muted">Unduh PDF dan tinjau hasil setiap eksekusi.</p></div><button onClick={refresh} disabled={loading}>Refresh laporan</button></div>
+  return <main><div className="page-heading"><div><p className="eyebrow">Arsip operasional</p><h1>Laporan & riwayat</h1><p className="muted">Unduh PDF atau ZIP laporan harian dan tinjau hasil setiap eksekusi. PDF dalam ZIP tetap dapat diunduh satu per satu melalui riwayat.</p></div><button onClick={refresh} disabled={loading}>Refresh laporan</button></div>
     {error&&<div className="alert error" role="alert">{error}</div>}
     <section className="card"><div className="card-heading"><h2>Arsip PDF</h2><a href="/">Buat laporan →</a></div>
       <div className="filter-row"><input aria-label="Cari PDF pada halaman ini" placeholder="Cari PDF pada halaman ini…" value={search} onChange={e=>setSearch(e.target.value)} /></div>
       {loading&&!reports.length?<p role="status">Memuat PDF…</p>:!filtered.length?<p className="empty">{reports.length ? "Tidak ada PDF yang cocok pada halaman ini." : "Belum ada laporan PDF."}</p>:
         <div className="table-wrap"><table><thead><tr><th>Nama file</th><th>Dibuat</th><th>Ukuran</th><th>Unduh</th></tr></thead><tbody>
           {filtered.map(r=><tr key={r.filename}><td style={{overflowWrap:"anywhere"}}>{r.filename}</td><td className="nowrap">{new Date(r.created*1000).toLocaleString("id-ID")}</td>
-            <td>{(r.size/1024).toFixed(1)} KB</td><td><a href={r.download_url} target="_blank" rel="noreferrer">Unduh PDF ↗</a></td></tr>)}
+            <td>{(r.size/1024).toFixed(1)} KB</td><td><a href={r.download_url} target="_blank" rel="noreferrer">Unduh {r.filename.toLowerCase().endsWith(".zip")?"ZIP":"PDF"} ↗</a></td></tr>)}
         </tbody></table></div>}
       {pager(page,total,setPage)}
     </section>

@@ -1,11 +1,12 @@
 from fastapi import APIRouter
 
-from app.api.v1 import dashboard, history, reports, schedules, zabbix
+from app.api.v1 import auto_schedules, dashboard, history, reports, schedules, zabbix
 
 
 api_router = APIRouter()
 
 for router in (
+    auto_schedules.router,
     zabbix.router,
     reports.router,
     schedules.router,

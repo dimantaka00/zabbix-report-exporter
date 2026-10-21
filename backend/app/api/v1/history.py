@@ -12,7 +12,7 @@ async def get_execution_history(
     rows = await pool.fetch("""
         SELECT h.id,h.schedule_id,COALESCE(h.schedule_name,s.name) AS schedule_name,
             COALESCE(h.host_name,s.host_name) AS host_name,h.started_at,h.finished_at,
-            h.status,h.report_filename,h.error_message,h.trigger_type
+            h.status,h.report_filename,h.archive_filename,h.error_message,h.trigger_type
         FROM report_execution_logs h LEFT JOIN report_schedules s ON s.id=h.schedule_id
         ORDER BY h.started_at DESC,h.id DESC LIMIT $1 OFFSET $2
     """, limit, offset)

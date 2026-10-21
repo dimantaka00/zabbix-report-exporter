@@ -1,0 +1,81 @@
+{
+    "checked_at":  "2026-10-12T15:44:35.1883385+07:00",
+    "full_regression":  {
+                            "status":  "passed",
+                            "disposable_database":  true,
+                            "tests":  136
+                        },
+    "final_automatic_suite":  {
+                                  "status":  "passed",
+                                  "disposable_database":  true,
+                                  "tests":  17
+                              },
+    "distinct_backend_tests":  138,
+    "browser":  {
+                    "status":  "passed",
+                    "tests":  72,
+                    "viewports":  [
+                                      "desktop",
+                                      "mobile"
+                                  ]
+                },
+    "live":  {
+                 "pages":  {
+                               "/schedules":  200,
+                               "/":  200,
+                               "/reports":  200
+                           },
+                 "preview":  {
+                                 "hosts":  6609,
+                                 "servers":  [
+                                                 {
+                                                     "id":  "primary",
+                                                     "hosts":  3084,
+                                                     "enabled":  1725,
+                                                     "disabled":  1359
+                                                 },
+                                                 {
+                                                     "id":  "secondary",
+                                                     "hosts":  3525,
+                                                     "enabled":  1127,
+                                                     "disabled":  2398
+                                                 }
+                                             ],
+                                 "metric_selection":  "all_numeric",
+                                 "max_metrics_per_pdf":  20
+                             },
+                 "checked_at":  "2026-10-12T15:41:57.1983815+07:00",
+                 "automatic_schedules":  0,
+                 "authentication_enabled":  false
+             },
+    "live_browser":  {
+                         "value":  [
+                                       {
+                                           "viewport":  "desktop",
+                                           "time_00_00":  true,
+                                           "time_23_59":  true,
+                                           "default_enabled":  false,
+                                           "overflow":  false,
+                                           "errors":  [
+
+                                                      ],
+                                           "scope":  "Cakupan saat ini: 6609 host (Zabbix 1: 3084, Zabbix 2: 3525). Jumlah metrik dihitung saat host diproses."
+                                       },
+                                       {
+                                           "viewport":  "mobile",
+                                           "time_00_00":  true,
+                                           "time_23_59":  true,
+                                           "default_enabled":  false,
+                                           "overflow":  false,
+                                           "errors":  [
+
+                                                      ],
+                                           "scope":  "Cakupan saat ini: 6609 host (Zabbix 1: 3084, Zabbix 2: 3525). Jumlah metrik dihitung saat host diproses."
+                                       }
+                                   ],
+                         "Count":  2
+                     },
+    "rollback_snapshot":  "D:/KERJAAN/zabbix-report-exporter-backups/20261012_145408_145b09cc",
+    "new_bulk_schedule_created":  false,
+    "external_server_migration":  false
+}

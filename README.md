@@ -1,14 +1,22 @@
 # Zabbix Report Exporter
 
-Aplikasi LAN internal untuk membaca metrik Zabbix, membuat laporan PDF, dan menjalankan laporan harian. MVP mencakup monitoring, laporan manual, jadwal harian, arsip PDF, riwayat eksekusi, serta backup dan uji pemulihan. Login operator berada pada tahap berikutnya, sesuai batas MVP yang disepakati.
+Aplikasi LAN internal untuk membaca metrik Zabbix, membuat laporan PDF, dan menjalankan laporan harian. MVP mencakup monitoring, laporan manual, jadwal harian, arsip PDF, riwayat eksekusi, serta backup dan uji pemulihan. Login admin/operator dan dashboard monitoring akses tersedia; saat ini dinonaktifkan sementara pada lingkungan lokal dengan `AUTH_ENABLED=false` sambil menunggu migrasi server. Lihat [login dan monitoring akses](docs/access-monitoring.md).
 
-Dashboard menyediakan **mode terang dan gelap** dengan aksen biru, navigasi samping pada desktop, navigasi ringkas pada ponsel, kartu status layanan, dan grafik dengan area berwarna. Tombol tema berada di bar atas pada semua halaman. Tema awal mengikuti pengaturan perangkat; pilihan manual tersimpan di browser, bertahan setelah reload, dan disinkronkan antar-tab. Formulir, tabel, badge, serta grafik mengikuti tema. Ikon SVG disimpan dalam kode tanpa font atau aset eksternal. Angka ringkasan dan waktu pembaruan berasal dari respons aplikasi.
+Dashboard menyediakan **mode terang dan gelap** dengan latar biru keunguan dan aksen cyan/hijau mint, navigasi samping ringkas pada desktop, navigasi horizontal pada ponsel, kartu status layanan, dan grafik dengan area berwarna. Tombol tema berada di bar atas pada semua halaman. Tema awal adalah gelap; pilihan manual tersimpan di browser, bertahan setelah reload, dan disinkronkan antar-tab. Formulir, tabel, badge, serta grafik mengikuti tema. Ikon SVG disimpan dalam kode tanpa font atau aset eksternal. Angka ringkasan dan waktu pembaruan berasal dari respons aplikasi.
+
+Setiap pekerjaan yang menambah atau mengubah file proyek diakhiri dengan **backup lengkap baru** di folder saudara `zabbix-report-exporter-backups`, tanpa menimpa snapshot sebelumnya. Aturan agen disimpan di [AGENTS.md](AGENTS.md), dan panduan pemulihan tersedia di [backup dan rollback](docs/backup-recovery.md).
 
 **Developed by Daniel Christoper I.P** — kredit pengembang ditampilkan di footer seluruh halaman.
 
 Identitas dashboard menggunakan **TIM DATA CENTER PUSDATIN KEMENSOS**. Logo Kemensos di pojok kiri atas disimpan lokal pada `frontend/public/brand/kemensos.png`, bersumber dari [aset situs resmi Kementerian Sosial](https://kemensos.go.id/assets/img/favicon.png), agar tersedia tanpa akses internet dari browser pengguna.
 
 ## Alur penggunaan
+
+Pada **Jadwal → Jadwal otomatis host & metrik**, tentukan sumber Zabbix, host dan metrik, zona waktu, serta jam eksekusi harian **00:00–23:59**. **Jam mulai–akhir laporan** mengatur rentang data hari sebelumnya, dengan default **00:00–23:59**. **Tanggal mulai–akhir jadwal** membatasi masa eksekusi harian. Kategori host group **CS (COMNET saja), TLK, ICON, HYP, MILES** tersedia dengan pemilihan group per sumber Zabbix. Metrik dibagi maksimal 20 per PDF. Opsi **Kemas PDF menjadi satu ZIP** menyimpan satu paket terkompresi per jadwal per hari, lalu membersihkan PDF sementara setelah ZIP terverifikasi; setiap PDF tetap dapat diunduh melalui riwayat tanpa mengekstrak salinan ke disk. Progres tersimpan agar pemrosesan dapat dilanjutkan setelah restart. Jadwal baru tersimpan nonaktif sampai Anda mencentang aktivasi. Petunjuk tersedia pada [jadwal otomatis, pemilihan host/metrik, dan ZIP](docs/automatic-daily-schedules.md).
+
+Untuk menggabungkan beberapa metrik, centang minimal dua metrik lalu pilih **Mode grafik dan PDF → Grafik gabungan dari metrik terpilih**. Tombol **Tampilkan grafik** menampilkan semua metrik tersebut dalam satu grafik per hari; **Ekspor PDF** menggunakan mode yang sama. Received berwarna hijau dan Sent merah, dengan legenda serta satu baris statistik **Last, Min, Average, Max** untuk setiap metrik. Satuan grafik disamakan untuk metrik sejenis; statistik mempertahankan konversi unit asli masing-masing metrik. Pilihan grafik terpisah tetap tersedia. Lihat [panduan grafik gabungan](docs/combined-metrics.md).
+
+Setelah memilih host pada **Monitoring**, panel **Detail host** otomatis menampilkan **IP address, DNS, port, versi SNMP, groups, description, templates, dan proxy** dari sumber Zabbix yang dipilih. Semua interface ditampilkan, termasuk alamat polling IP/DNS dan pengaturan bulk/security level SNMP. Panel dapat dilipat. Data yang belum diisi diberi keterangan kosong; community string serta password SNMP tidak dikirim ke browser. Detail ini digunakan untuk pemeriksaan sebelum ekspor PDF. Lihat [panduan detail host](docs/host-details.md).
 
 1. Buka `http://localhost:8080` atau alamat LAN komputer server.
 2. Pada **Monitoring**, pilih server Zabbix, cari host berdasarkan nama/kode, lalu cari satu atau beberapa metrik berdasarkan nama, key, ID, atau unit. Resolusi **per menit** aktif secara default dan tanggal awal adalah hari kemarin. Pilih **Tanggal laporan** untuk periode 00:00–23:59:59 waktu lokal. Grafik memakai sumbu tetap 00:00–23:59 dan kursor menampilkan waktu HH:MM serta nilai sampel. PDF menampilkan nama metrik, grafik, dan satu tabel statistik harian dengan kolom **Interface Parameter, Last, Min, Average, Max**, tanpa daftar Included metrics. Setiap nilai bandwidth memilih satuannya sendiri sesuai besar nilai: **bps, Kbps, Mbps, Gbps, atau Tbps**, dengan dua angka desimal, misalnya Last **498,85 Kbps**, Min **11,58 Kbps**, Average **2,69 Mbps**, dan Max **13,02 Mbps**. Konversi jaringan memakai basis desimal: 1 Kbps = 1.000 bps dan 1 Mbps = 1.000.000 bps. Sumbu grafik tetap memakai satu satuan per grafik. Metrik lain tetap memakai satuan aslinya dengan kolom pertama **Parameter**. **Last** adalah sampel terakhir yang tersedia pada hari itu, bukan rata-rata menit terakhir atau jumlah sampel; jika hanya tersedia trend, kolom Last menampilkan tanda kosong. Periode beberapa hari menghasilkan grafik dan statistik terpisah untuk setiap hari.
@@ -58,11 +66,11 @@ Kedua sumber Zabbix dapat menggunakan versi yang berbeda. Klien mendeteksi versi
 
 ## Menjalankan produksi
 
-Prasyarat: Docker Desktop dengan Linux containers, Docker Compose v2, akses jaringan ke Zabbix, dan API token baca dengan hak host/item/history/trend yang diperlukan. Untuk menggunakan dua server, isi `ZABBIX_SECONDARY_URL` dan `ZABBIX_SECONDARY_API_TOKEN` pada `.env`; keduanya opsional. Jika sertifikat HTTPS Zabbix 2 memakai CA internal, minta administrator memberikan sertifikat CA/intermediate publik dalam format PEM (jangan minta atau menyalin private key), simpan sebagai `certs/zabbix-secondary-ca.pem`, lalu set `ZABBIX_SECONDARY_CA_FILE=/run/zabbix-certs/zabbix-secondary-ca.pem`. Backend dan worker memasang folder `certs` hanya-baca dan tetap memvalidasi TLS. Pilih **Zabbix 1** atau **Zabbix 2** pada halaman Monitoring atau Jadwal. Pilihan server disimpan bersama jadwal sehingga laporan otomatis tetap membaca host dan metrik dari server yang dipilih. Jadwal lama tetap menggunakan Zabbix 1.
+Prasyarat: Docker Desktop dengan Linux containers, Docker Compose v2, akses jaringan ke Zabbix, dan API token baca dengan hak host/item/history/trend yang diperlukan. Untuk menggunakan dua server, isi `ZABBIX_SECONDARY_URL` dan `ZABBIX_SECONDARY_API_TOKEN` pada `.env`; keduanya opsional. Jika sertifikat HTTPS Zabbix 2 memakai CA internal, minta administrator memberikan sertifikat CA/intermediate publik dalam format PEM (jangan minta atau menyalin private key), simpan sebagai `certs/zabbix-secondary-ca.pem`, lalu set `ZABBIX_SECONDARY_CA_FILE=/run/zabbix-certs/zabbix-secondary-ca.pem`. Backend dan worker memasang folder `certs` hanya-baca dan tetap memvalidasi TLS. Pilih **Zabbix 7** atau **Zabbix 2** pada halaman Monitoring atau Jadwal. Pilihan server disimpan bersama jadwal sehingga laporan otomatis tetap membaca host dan metrik dari server yang dipilih. Jadwal lama tetap menggunakan Zabbix 7.
 
 ```powershell
 Copy-Item .env.example .env
-# Edit .env: ganti kata sandi, URL Zabbix, dan API token.
+# Edit .env: ganti kata sandi, URL Zabbix, API token, dan AUTH_BOOTSTRAP_PASSWORD unik (minimal 12 karakter).
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait
 docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
 ```
@@ -110,6 +118,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-restore.ps1
 
 Backup menghasilkan arsip PostgreSQL custom `.dump` dan arsip PDF `.zip`. Backup lama dipertahankan. Uji restore memulihkan arsip hanya pada database sementara dan memeriksa tabel serta jumlah baris. Pemulihan produksi merupakan tindakan terpisah yang memerlukan pemeriksaan backup, penghentian writer, dan persetujuan penggantian data.
 
+Untuk backup lengkap kode, riwayat Git, konfigurasi lokal, sertifikat, database, PDF, dan image Docker, jalankan `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/backup-project.ps1`. Snapshot tersimpan di folder terpisah `D:\KERJAAN\zabbix-report-exporter-backups`, sehingga tidak ikut hilang saat folder proyek terhapus. Script juga menguji restore database sementara dan memeriksa checksum arsip. Petunjuk rollback tersedia di [panduan backup dan pemulihan](docs/backup-recovery.md), dan disalin ke setiap snapshot bersama script pemulihan.
+
 Setelah kedua image lulus pengujian:
 
 ```powershell
@@ -127,10 +137,12 @@ node scripts/smoke-live.cjs
 
 Script pertama memakai salinan database sementara dan membaca Zabbix nyata. Script kedua memakai host 16500/metrik 917040 dan 917037 pada aplikasi aktif, serta membuat satu PDF manual verifikasi; sesuaikan fixture jika konfigurasi Zabbix berbeda. Bukti pengujian tersimpan di docs/mvp-live-validation.json.
 
-Untuk memeriksa tema pada desktop, tablet, dan ponsel tanpa menulis laporan atau jadwal, jalankan `node scripts/check-dashboard-theme.cjs`. Pemeriksaan memakai host 16500 dan metrik SNMP agent availability; host dapat diganti melalui `MVP_HOST_ID`. Bukti tersimpan di [dashboard-theme-validation.json](docs/dashboard-theme-validation.json); screenshot lokal ada di backup/light-enterprise-desktop.png dan backup/light-enterprise-mobile.png.
+Dashboard memakai tema gelap biru keunguan dengan aksen cyan dan hijau mint sesuai referensi. Mode terang tetap tersedia, dan preferensi pengguna tersimpan. Detail tampilan serta rollback ada di [tema dashboard](docs/dashboard-reference-theme.md).
+
+Untuk memeriksa tema pada desktop, tablet, dan ponsel tanpa menulis laporan atau jadwal, jalankan `node scripts/check-dashboard-theme.cjs`. Pemeriksaan memakai host 16500 dan metrik SNMP agent availability; host dapat diganti melalui `MVP_HOST_ID`, dan alamat aplikasi melalui `MVP_BASE_URL`. Bukti tersimpan di [dashboard-reference-theme-validation.json](docs/dashboard-reference-theme-validation.json); screenshot lokal ada di `.cache/reference-live-desktop.png` dan `.cache/reference-live-mobile.png`.
 
 Proyek server ini berada di `D:\KERJAAN\zabbix-report-exporter`; PDF dan backup mengikuti folder proyek. Disk Docker berada di `D:\DockerDesktopWSL`. Detail lokasi, verifikasi data, dan cara membuka workspace tersedia di [catatan migrasi penyimpanan](docs/storage-migration.md).
 
 ## Batas tahap ini
 
-Akses mengikuti LAN tepercaya; login/RBAC belum termasuk. Pengiriman email/WhatsApp, jadwal mingguan/bulanan, HA multi-server, dan kebijakan penghapusan otomatis PDF juga berada pada tahap berikutnya. Klaim selesai berlaku pada kriteria penerimaan MVP yang diuji, bukan jaminan bahwa semua kemungkinan kegagalan perangkat, jaringan, atau data eksternal dapat dieliminasi.
+Login admin/operator berlaku saat `AUTH_ENABLED=true`; lingkungan lokal sementara memakai `AUTH_ENABLED=false` sehingga monitoring bisa dibuka langsung. Dashboard admin mencatat akun, waktu, IP, perangkat, dan perkiraan negara IP publik. HTTPS untuk LAN perlu disediakan melalui reverse proxy. Pengiriman email/WhatsApp, jadwal mingguan/bulanan, HA multi-server, dan kebijakan penghapusan otomatis PDF juga berada pada tahap berikutnya. Klaim selesai berlaku pada kriteria penerimaan MVP yang diuji, bukan jaminan bahwa semua kemungkinan kegagalan perangkat, jaringan, atau data eksternal dapat dieliminasi.

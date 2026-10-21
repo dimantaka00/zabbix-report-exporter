@@ -1,0 +1,46 @@
+{
+  "date": "2026-10-12",
+  "timezone": "Asia/Jakarta",
+  "backend_tests": {"passed": 119, "database": "disposable PostgreSQL", "redis": "disposable Redis"},
+  "browser_tests": {
+    "existing_monitoring_passed": 58,
+    "login_admin_passed": 8,
+    "platforms": ["desktop Chrome", "mobile emulation"],
+    "notes": "Existing monitoring scenarios passed on the final frontend image; login/admin scenarios passed in a targeted final rerun after correcting test selectors."
+  },
+  "frontend_production_build": "passed, including TypeScript",
+  "nginx_configuration": "valid",
+  "deployment": {
+    "base_url": "http://localhost:8080",
+    "login_http": 200,
+    "protected_pages_anonymous_http": 302,
+    "business_and_admin_api_anonymous_http": 401,
+    "bootstrap_login": "passed; admin role and mandatory password change verified",
+    "logout": "passed",
+    "forwarded_ip_spoof": "rejected; forged 8.8.8.8 header did not change logged client IP",
+    "localhost_ip_seen_by_nginx": "172.18.0.1 (Docker gateway)",
+    "users_after_bootstrap": 1,
+    "sessions_after_verification_logout": 0,
+    "existing_schedules_preserved": 2,
+    "existing_report_history_preserved": 907,
+    "container_health": "backend, frontend, worker, PostgreSQL and Redis healthy; Nginx running",
+    "live_login_render": "desktop and mobile passed without page errors"
+  },
+  "geoip": {
+    "provider": "DB-IP Lite",
+    "release": "2026-10",
+    "lookup": "local; no visitor IP sent to external services",
+    "database_sha1": "e515b63075ad48847f9c4332b724742e8ba15b0e",
+    "checksum_matches_provider": true,
+    "offline_test": {"8.8.8.8": "US", "192.168.1.10": "internal, no country", "::1": "internal, no country"}
+  },
+  "rollback_snapshot": "D:\\KERJAAN\\zabbix-report-exporter-backups\\20261012_095403_223c3cc2",
+  "rollback_snapshot_status": "verified; database restore test passed",
+  "limitations": [
+    "HTTP deployment; HTTPS must be configured for encrypted LAN login and secure cookies.",
+    "Country is an approximate network location; LAN addresses have no inferred country.",
+    "NAT, Docker Desktop and VPN can hide the original visitor address behind a shared gateway.",
+    "Browser/user-agent and attempted login username are client-reported, not verified physical identities.",
+    "Earlier security findings outside authentication/access monitoring are not all remediated by this feature."
+  ]
+}

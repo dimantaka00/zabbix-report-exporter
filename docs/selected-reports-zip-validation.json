@@ -1,0 +1,81 @@
+{
+    "checked_at":  "2026-10-12T17:15:10.4898660+07:00",
+    "backend":  {
+                    "status":  "passed",
+                    "database":  "disposable",
+                    "tests":  155
+                },
+    "browser":  {
+                    "status":  "passed",
+                    "tests":  74,
+                    "viewports":  [
+                                      "desktop",
+                                      "mobile"
+                                  ]
+                },
+    "zip_checks":  [
+                       "CRC and SHA-256 match original PDFs",
+                       "PDF downloads stream from ZIP without extracted disk copies",
+                       "Manual and previous PDFs preserved",
+                       "Failed or corrupt archive preserves originals",
+                       "Restart recovers cleanup after READY",
+                       "Selected metrics above twenty split into multiple PDFs",
+                       "Exclusive backup lock blocks packaging and PDF deletion until database and files are copied"
+                   ],
+    "deployment":  {
+                       "automatic_policies_after":  1,
+                       "automatic_policies_before":  1,
+                       "checked_at":  "2026-10-12T16:42:09.2619429+07:00",
+                       "pages":  {
+                                     "/schedules":  200,
+                                     "/":  200,
+                                     "/api/v1/reports":  200,
+                                     "/reports":  200
+                                 },
+                       "authentication_enabled":  false
+                   },
+    "live_browser":  {
+                         "viewports":  [
+                                           {
+                                               "viewport":  "desktop",
+                                               "selected_hosts":  1,
+                                               "selected_metrics":  1,
+                                               "zip_default":  true,
+                                               "automatic_activation":  false,
+                                               "overflow":  false,
+                                               "runtime_errors":  [
+
+                                                                  ]
+                                           },
+                                           {
+                                               "viewport":  "mobile",
+                                               "selected_hosts":  1,
+                                               "selected_metrics":  1,
+                                               "zip_default":  true,
+                                               "automatic_activation":  false,
+                                               "overflow":  false,
+                                               "runtime_errors":  [
+
+                                                                  ]
+                                           }
+                                       ],
+                         "draft_saved_and_removed":  true,
+                         "existing_schedule_state_preserved":  true,
+                         "automatic_report_generation_started":  false
+                     },
+    "rollback_snapshot":  "D:/KERJAAN/zabbix-report-exporter-backups/20261012_160320_d8dfc8bc",
+    "existing_automatic_schedule_preserved":  true,
+    "login_enabled":  false,
+    "external_server_migration":  false,
+    "backup_source_regression":  "passed",
+    "final_feature_browser":  {
+                                  "status":  "passed",
+                                  "selection_scope_count":  "passed",
+                                  "tests":  6,
+                                  "viewports":  [
+                                                    "desktop",
+                                                    "mobile"
+                                                ]
+                              },
+    "runtime_source_matches_images":  true
+}

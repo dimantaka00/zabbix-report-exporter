@@ -3,12 +3,15 @@
 import { useEffect, useState, useRef } from "react";
 import MetricPicker from "../components/MetricPicker";
 import Chart from "../components/Chart";
+import CombinedChart from "../components/CombinedChart";
+import {combinedUnit} from "../lib/combined";
 import HostDowntime from "../components/HostDowntime";
 import HostPicker from "../components/HostPicker";
+import HostDetails from "../components/HostDetails";
 import HistoryTable from "../components/HistoryTable";
 import Icon from "../components/Icon";
 import type {IconName} from "../components/Icon";
-import { api, numericItems, localInput, responseError, downloadFilename } from "../lib/api";
+import { api, numericItems, localInput, responseError, downloadFilename, getCsrfToken } from "../lib/api";
 import type { Host, Item, MetricData, Execution, ZabbixServer } from "../lib/api";
 
 type Summary = {total_schedules: number; active_schedules: number; total_reports: number};
@@ -46,23 +49,35 @@ export default function Home() {
   const [updatedAt,setUpdatedAt] = useState<Date | null>(null);
   const [history,setHistory] = useState<Execution[]>([]);
   const [chart,setChart] = useState<MetricData | null>(null);
+  const [chartMode,setChartMode] = useState<"separate"|"combined">("separate");
+  const [combinedChart,setCombinedChart] = useState<MetricData[]|null>(null);
   const [loading,setLoading] = useState(true), [loadingItems,setLoadingItems] = useState(false);
   const [loadingChart,setLoadingChart] = useState(false), [generating,setGenerating] = useState(false);
   const [error,setError] = useState(""), [dashboardError,setDashboardError] = useState("");
   const [message,setMessage] = useState(""), [partial,setPartial] = useState(false);
   const chartRequest = useRef<AbortController | null>(null);
+  const dashboardRequest = useRef<AbortController | null>(null);
 
   async function refreshDashboard() {
-    const results = await Promise.allSettled([
-      api<Summary>("/dashboard/summary"), api<Record<string,string>>("/dashboard/status"),
-      api<Execution[]>("/history?limit=10"),
-    ]);
-    const [stats,status,logs] = results;
-    if (stats.status === "fulfilled") setSummary(stats.value.data);
-    if (status.status === "fulfilled") {setServices(status.value.data);setUpdatedAt(new Date());}
-    if (logs.status === "fulfilled") setHistory(logs.value.data);
-    const failure = results.find(r => r.status === "rejected");
-    setDashboardError(failure?.status === "rejected" ? failure.reason.message : "");
+    if (dashboardRequest.current && !dashboardRequest.current.signal.aborted) return;
+    const controller = new AbortController();
+    dashboardRequest.current = controller;
+    try {
+      const results = await Promise.allSettled([
+        api<Summary>("/dashboard/summary", {signal:controller.signal}),
+        api<Record<string,string>>("/dashboard/status", {signal:controller.signal}),
+        api<Execution[]>("/history?limit=10", {signal:controller.signal}),
+      ]);
+      if (controller.signal.aborted) return;
+      const [stats,status,logs] = results;
+      if (stats.status === "fulfilled") setSummary(stats.value.data);
+      if (status.status === "fulfilled") {setServices(status.value.data);setUpdatedAt(new Date());}
+      if (logs.status === "fulfilled") setHistory(logs.value.data);
+      const failure = results.find(r => r.status === "rejected");
+      setDashboardError(failure?.status === "rejected" ? failure.reason.message : "");
+    } finally {
+      if (dashboardRequest.current === controller) dashboardRequest.current = null;
+    }
   }
   useEffect(() => {
     const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
@@ -71,7 +86,7 @@ export default function Home() {
       .catch(e => setError(e.message));
     refreshDashboard();
     const timer = setInterval(refreshDashboard, 30000);
-    return () => {clearInterval(timer); chartRequest.current?.abort();};
+    return () => {clearInterval(timer); chartRequest.current?.abort(); dashboardRequest.current?.abort();};
   }, []);
   useEffect(() => {
     setHosts([]); setHostId(""); setHostSearch(""); setItems([]); setSelected([]); setMetricId(""); setChart(null);
@@ -98,7 +113,17 @@ export default function Home() {
   useEffect(() => {
     if (!selected.includes(metricId)) setMetricId(selected[0] || "");
   }, [selected,metricId]);
-  useEffect(() => {chartRequest.current?.abort(); setChart(null);}, [metricId,from,to,zabbixServer,resolution]);
+  useEffect(() => {
+    chartRequest.current?.abort();setLoadingChart(false);setChart(null);setCombinedChart(null);
+  }, [metricId,from,to,zabbixServer,resolution,hostId,chartMode]);
+  useEffect(()=>{
+    if(chartMode==="combined"){chartRequest.current?.abort();setLoadingChart(false);setCombinedChart(null);}
+  },[selected,chartMode]);
+
+  function validateCombined(){
+    if(selected.length<2)throw new Error("Pilih minimal dua metrik untuk grafik gabungan.");
+    combinedUnit(items.filter(item=>selected.includes(item.itemid)));
+  }
 
   function period() {
     if (periodMode === "monthly" && !validMonthRange(reportMonth,firstDay,lastDay)) {
@@ -136,11 +161,28 @@ export default function Home() {
     setError(""); setLoadingChart(true);
     const controller = new AbortController(); chartRequest.current?.abort(); chartRequest.current = controller;
     try {
-      if (!metricId) throw new Error("Pilih minimal satu metrik.");
+      if (chartMode==="combined")validateCombined();
+      else if (!metricId) throw new Error("Pilih minimal satu metrik.");
       const p = period();
-      const result = await api<MetricData>(`/zabbix/items/${metricId}/data?time_from=${p.time_from}&time_till=${p.time_till}&server_id=${zabbixServer}&resolution=${resolution}`, {signal:controller.signal});
-      setChart(result.data);
-    } catch (e) {if (e instanceof Error && e.name !== "AbortError") setError(e.message);}
+      if(chartMode==="combined"){
+        const results:MetricData[]=[];
+        for(let index=0;index<selected.length;index+=4){
+          const batch=await Promise.all(selected.slice(index,index+4).map(async id=>{
+            try{return (await api<MetricData>(`/zabbix/items/${id}/data?time_from=${p.time_from}&time_till=${p.time_till}&server_id=${zabbixServer}&resolution=${resolution}`,{signal:controller.signal})).data;}
+            catch(e){
+              if(controller.signal.aborted)throw e;
+              return {item:items.find(item=>item.itemid===id)!,source:"unavailable",points:[],...p,resolution,
+                summary:{minimum:null,maximum:null,average:null,last:null,samples:0},warning:e instanceof Error?e.message:"Data metrik tidak tersedia."} as MetricData;
+            }
+          }));
+          results.push(...batch);
+        }
+        if(!controller.signal.aborted)setCombinedChart(results);
+      }else{
+        const result = await api<MetricData>(`/zabbix/items/${metricId}/data?time_from=${p.time_from}&time_till=${p.time_till}&server_id=${zabbixServer}&resolution=${resolution}`, {signal:controller.signal});
+        if(!controller.signal.aborted)setChart(result.data);
+      }
+    } catch (e) {if (!controller.signal.aborted && e instanceof Error && e.name !== "AbortError") setError(e.message);}
     finally {if (chartRequest.current === controller) setLoadingChart(false);}
   }
   async function generate() {
@@ -149,10 +191,11 @@ export default function Home() {
       const host = hosts.find(h => h.hostid === hostId);
       if (!host || !selected.length) throw new Error("Pilih host dan minimal satu metrik.");
       if (!title.trim()) throw new Error("Judul laporan wajib diisi.");
+      if(chartMode==="combined")validateCombined();
       const response = await fetch("/api/v1/reports/generate", {
-        method:"POST", headers:{"Content-Type":"application/json"},
+        method:"POST", headers:{"Content-Type":"application/json","X-CSRF-Token":getCsrfToken()},
         body:JSON.stringify({zabbix_server:zabbixServer,host_id:hostId,host_name:host.name || host.host,item_ids:selected,
-          ...period(),resolution,title,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,
+          ...period(),resolution,title,chart_mode:chartMode,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,
           include_downtime:includeDowntime,downtime_trigger_id:downtimeTriggerId || null}),
       });
       if (!response.ok) throw await responseError(response);
@@ -170,21 +213,19 @@ export default function Home() {
 
   return <main>
     <div className="page-heading dashboard-heading"><div className="heading-copy"><p className="eyebrow"><span className="eyebrow-dot"/>TIM DATA CENTER PUSDATIN KEMENSOS</p><h1>Monitoring & laporan</h1><p className="muted">Pantau infrastruktur dan siapkan laporan operasional dalam satu workspace.</p></div>
-      <div className="heading-tools"><span className="sync-label"><Icon name="clock"/>{updatedAt ? `Diperbarui ${updatedAt.toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}` : "Menunggu pembaruan"}</span>
-      <button onClick={refreshDashboard}><Icon name="refresh"/>Refresh dashboard</button></div></div>
-    {dashboardError && <div className="alert error" role="alert">{dashboardError}</div>}
-    <section className="card"><div className="form-grid">
-      <label><span>Sumber Zabbix</span><select value={zabbixServer} onChange={e => {
-        setError("");setZabbixServer(e.target.value === "secondary" ? "secondary" : "primary");
+      <div className="heading-tools"><label className="source-control"><span>Sumber Zabbix</span><select value={zabbixServer} onChange={e => {
+        setError("");setHostId("");setHostSearch("");setZabbixServer(e.target.value === "secondary" ? "secondary" : "primary");
       }}>
         {servers.map(server => <option key={server.id} value={server.id} disabled={!server.configured}>
           {server.name}{server.configured ? "" : " (belum dikonfigurasi)"}
         </option>)}</select></label>
-    </div></section>
+      <span className="sync-label"><Icon name="clock"/>{updatedAt ? `Diperbarui ${updatedAt.toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}` : "Menunggu pembaruan"}</span>
+      <button onClick={refreshDashboard}><Icon name="refresh"/>Refresh dashboard</button></div></div>
+    {dashboardError && <div className="alert error" role="alert">{dashboardError}</div>}
     <div className="stat-grid">
       {[
         ["Host",loading ? "…" : hosts.length,"server","Terdaftar di Zabbix"],
-        ["Laporan PDF",summary?.total_reports ?? "…","file","Tersimpan di arsip"],
+        ["Laporan PDF / ZIP",summary?.total_reports ?? "…","file","Tersimpan di arsip"],
         ["Jadwal aktif",summary?.active_schedules ?? "…","calendar","Laporan otomatis"],
         ["Total jadwal",summary?.total_schedules ?? "…","layers","Konfigurasi tersimpan"],
       ].map(([label,value,icon,description]) =>
@@ -192,7 +233,7 @@ export default function Home() {
           <strong>{value}</strong><small>{description}</small></div>)}
     </div>
     <section className="card"><div className="card-heading"><div className="section-title"><span className="section-icon"><Icon name="activity"/></span><div><h2>Status layanan</h2><p>Koneksi dan kesiapan sistem</p></div></div><span className="refresh-meta"><Icon name="refresh"/>Setiap 30 detik</span></div>
-      <div className="status-grid">{[["backend","Backend","server"],["postgresql","Database","database"],["redis","Redis","layers"],["zabbix","Zabbix 1","network"],["zabbix_secondary","Zabbix 2","network"],["scheduler","Scheduler","calendar"]].map(([key,label,icon]) => {
+      <div className="status-grid">{[["backend","Backend","server"],["postgresql","Database","database"],["redis","Redis","layers"],["zabbix","Zabbix 7","network"],["zabbix_secondary","Zabbix 2","network"],["scheduler","Scheduler","calendar"]].map(([key,label,icon]) => {
         const value=services[key] || "checking",good=["connected","running"].includes(value),failed=["error","stopped"].includes(value);
         const captions:Record<string,string>={connected:"Terhubung",running:"Berjalan",starting:"Memulai",error:"Gangguan",stopped:"Berhenti",unknown:"Belum diketahui",checking:"Memeriksa…",not_configured:"Belum dikonfigurasi"};
         return <div className={`service ${good ? "service-good" : failed ? "service-error" : "service-warning"}`} key={key}><span className="service-icon"><Icon name={icon as IconName}/></span>
@@ -206,6 +247,7 @@ export default function Home() {
         <label className="span-two"><span>Judul laporan</span><input value={title} maxLength={200} onChange={e => setTitle(e.target.value)} /></label>
         <HostPicker key={zabbixServer} hosts={hosts} value={hostId} search={hostSearch} onSearchChange={setHostSearch}
           loading={loading} onChange={value=>{setError("");setHostId(value);}} />
+        {hostId && <HostDetails key={`${zabbixServer}:${hostId}`} hostId={hostId} serverId={zabbixServer}/>}
         <label className="span-two"><span>Periode laporan</span><select value={periodMode} onChange={e => selectPeriodMode(e.target.value as "daily" | "monthly" | "custom")}>
           <option value="daily">Satu hari</option><option value="monthly">Rentang tanggal dalam satu bulan</option><option value="custom">Periode khusus</option>
         </select></label>
@@ -227,15 +269,19 @@ export default function Home() {
         {periodMode === "monthly" && validMonthRange(reportMonth,firstDay,lastDay) && <p className="info-note">Satu PDF untuk {Number(lastDay)-Number(firstDay)+1} hari, tanggal {firstDay}–{lastDay} {new Date(`${reportMonth}-01T00:00`).toLocaleDateString("id-ID",{month:"long",year:"numeric"})}. Setiap tanggal diurutkan dengan grafik 00:00–23:59 dan statistiknya sendiri.</p>}
         <p className="info-note">Tanggal laporan mencakup 00:00–23:59 waktu lokal. Grafik per menit dan satu baris statistik per hari disertakan dalam PDF. Detail mengikuti interval sampel Zabbix; menit tanpa data tidak diisi. Periode maksimal 90 hari.</p>
         <MetricPicker items={items} selected={selected} onChange={setSelected} loading={loadingItems} />
+        <label className="chart-mode-field"><span>Mode grafik dan PDF</span><select value={chartMode} onChange={e=>{setError("");setChartMode(e.target.value as "separate"|"combined");}}>
+          <option value="separate">Grafik terpisah per metrik</option><option value="combined">Grafik gabungan dari metrik terpilih</option></select>
+          {chartMode==="combined" && <small>Pilih minimal 2 metrik dengan satuan sejenis. Received hijau, Sent merah; satu grafik per hari dan statistik tiap metrik.</small>}</label>
         <p className="info-note">Nama file PDF otomatis mengikuti nama host dan periode laporan.</p>
         <div className="actions"><button className="primary" onClick={generate} disabled={!selected.length || generating}>
           <Icon name="download"/>{generating ? "Membuat PDF…" : `Ekspor PDF (${selected.length} metrik)`}</button></div>
       </section>
       <section className="card chart-card"><div className="card-heading"><div className="section-title"><span className="section-icon"><Icon name="chart"/></span><div><h2>Pratinjau grafik</h2><p>Data metrik terpilih</p></div></div><span className="panel-index">02</span></div>
-        <label><span>Metrik grafik</span><select value={metricId} onChange={e => setMetricId(e.target.value)} disabled={!selected.length}>
-          <option value="">Pilih metrik</option>{items.filter(i => selected.includes(i.itemid)).map(i => <option key={i.itemid} value={i.itemid}>{i.name}</option>)}</select></label>
-        <div className="actions"><button onClick={preview} disabled={!metricId || loadingChart}><Icon name="activity"/>{loadingChart ? "Memuat grafik…" : "Tampilkan grafik"}</button></div>
-        {chart ? <Chart data={chart}/> : <div className="chart-empty"><span><Icon name="chart"/></span><strong>Pratinjau belum tersedia</strong><p>Pilih metrik dan tampilkan grafik untuk melihat data dan statistiknya.</p></div>}
+        {chartMode==="separate"?<label><span>Metrik grafik</span><select value={metricId} onChange={e => setMetricId(e.target.value)} disabled={!selected.length}>
+          <option value="">Pilih metrik</option>{items.filter(i => selected.includes(i.itemid)).map(i => <option key={i.itemid} value={i.itemid}>{i.name}</option>)}</select></label>:
+          <p className="muted">{selected.length} metrik terpilih akan ditampilkan bersama.</p>}
+        <div className="actions"><button onClick={preview} disabled={loadingChart || (chartMode==="combined"?selected.length<2:!metricId)}><Icon name="activity"/>{loadingChart ? "Memuat grafik…" : "Tampilkan grafik"}</button></div>
+        {combinedChart?<CombinedChart data={combinedChart}/>:chart ? <Chart data={chart}/> : <div className="chart-empty"><span><Icon name="chart"/></span><strong>Pratinjau belum tersedia</strong><p>Pilih metrik dan tampilkan grafik untuk melihat data dan statistiknya.</p></div>}
       </section>
     </div>
     <HostDowntime hostId={hostId} serverId={zabbixServer} from={from} to={to} triggerId={downtimeTriggerId}

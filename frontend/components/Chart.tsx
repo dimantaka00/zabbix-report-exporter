@@ -25,6 +25,8 @@ function dailySeries(data: MetricData): Day[] {
 }
 
 function DayChart({data,day}: {data: MetricData; day: Day}) {
+  const outgoing=/net\.if\.out|bits sent|bytes sent|outgoing|transmit/i.test(`${data.item.key_} ${data.item.name}`);
+  const hasRange=day.points.some(point=>point.min !== undefined && point.max !== undefined && point.min !== point.max);
   const fillId=`metric-fill-${useId().replace(/[^a-zA-Z0-9_-]/g,"")}`;
   const [hovered,setHovered] = useState<Point | null>(null);
   const stats = day.points.reduce((value,point) => {
@@ -61,8 +63,9 @@ function DayChart({data,day}: {data: MetricData; day: Day}) {
   const path=coords.map(([px,py],i)=>`${i ? "L" : "M"}${px},${py}`).join(" ");
   const area=coords.length ? `${path} L${coords[coords.length-1][0]},230 L${coords[0][0]},230 Z` : "";
   const time=(stamp: number)=>new Date(stamp*1000).toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit",hour12:false}).replace(".",":");
-  return <section className="daily-chart">
+  return <section className={`daily-chart${outgoing ? " chart-outgoing" : ""}`}>
     <div className="chart-heading"><div><h3>{data.item.name}</h3><p className="muted">{day.label} · 00:00–23:59 · {scale.unit || "Tanpa unit"} · {data.resolution === "minute" ? "Per menit" : data.source} · {day.points.length.toLocaleString("id-ID")} titik data</p></div></div>
+    <div className="chart-legend"><span className="chart-legend-dot"/>Nilai metrik{hasRange && <><span className="chart-legend-range"/>Rentang min–max</>}</div>
     <div className="chart-scroll"><svg viewBox="0 0 740 280" role="img" aria-label={`Grafik ${data.item.name}`}
       onPointerLeave={()=>setHovered(null)} onPointerMove={event=>{
         if (!day.points.length) return;
@@ -73,7 +76,7 @@ function DayChart({data,day}: {data: MetricData; day: Day}) {
       <title>{data.item.name} — {day.label}, 00:00–23:59</title>
       <text x="70" y="16" fontSize="10" fill="var(--chart-label)">{scale.unit || "Nilai"}</text>
       <defs><linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stopColor="var(--chart-fill)" stopOpacity=".18"/><stop offset="100%" stopColor="var(--chart-fill)" stopOpacity=".01"/>
+        <stop offset="0%" stopColor="var(--chart-fill)" stopOpacity=".28"/><stop offset="100%" stopColor="var(--chart-fill)" stopOpacity=".015"/>
       </linearGradient></defs>
       {[0,1,2,3,4].map(tick=><g key={tick}><line x1="70" x2="720" y1={230-tick*51.25} y2={230-tick*51.25} stroke="var(--chart-grid)" strokeDasharray={tick===0 ? undefined : "4 5"}/>
         <text x="59" y={234-tick*51.25} textAnchor="end" fontSize="11" fill="var(--chart-label)">{metricNumber((minimum+(maximum-minimum)*tick/4)*scale.factor,scale.unit)}</text></g>)}
@@ -86,7 +89,7 @@ function DayChart({data,day}: {data: MetricData; day: Day}) {
       {coords.length>1 && <path d={area} fill={`url(#${fillId})`} stroke="none"/>}
       {points.filter(point=>point.min !== undefined && point.max !== undefined && point.min !== point.max).map((point,i)=>
         <line key={i} x1={x(point)} x2={x(point)} y1={y(point.min!)} y2={y(point.max!)} stroke="var(--chart-range)" strokeWidth="1"/>)}
-      <path d={path} fill="none" stroke="var(--chart-stroke)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d={path} fill="none" stroke="var(--chart-stroke)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
       {coords.length===1 && <circle cx={coords[0][0]} cy={coords[0][1]} r="4" fill="var(--chart-stroke)"/>}
       {!day.points.length && <text x="395" y="130" textAnchor="middle" fontSize="13" fill="var(--chart-label)">Tidak ada data pada hari ini</text>}
       {hovered && <g><line x1={x(hovered)} x2={x(hovered)} y1="25" y2="230" stroke="var(--chart-stroke)" strokeDasharray="3 3"/>

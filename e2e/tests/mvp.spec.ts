@@ -1,6 +1,12 @@
 import {test,expect,type Page} from "@playwright/test";
 const host={hostid:"1",host:"host",name:"Test host",status:"0"};
 const disabledHost={hostid:"2",host:"archived-router",name:"Archived router",status:"1"};
+const details={...host,description:"Core router\nData center",groups:[{groupid:"5",name:"Network devices"}],
+  templates:[{templateid:"20",name:"Network SNMP template"}],
+  interfaces:[{interfaceid:"10",type:"2",main:"1",ip:"10.59.0.1",dns:"",useip:"1",port:"161",available:"1",
+    snmp:{version:"3",bulk:"1",securitylevel:"2"}},
+    {interfaceid:"11",type:"1",main:"1",ip:"",dns:"agent.example",useip:"0",port:"10050",available:"0",snmp:null}],
+  proxy:{mode:"proxy_group",id:"4",name:"DC group",assigned_proxy:{id:"8",name:"DC proxy"}},warnings:[]};
 const items=[
   {itemid:"10",hostid:"1",name:"CPU",key_:"cpu",units:"%",value_type:"0",status:"0"},
   {itemid:"11",hostid:"1",name:"Memory",key_:"memory",units:"%",value_type:"0",status:"0"},
@@ -18,11 +24,16 @@ async function mockAPI(page:Page, disposition='attachment; filename="Test_host_2
   await page.route("**/api/v1/**",async route=>{
     const request=route.request(),url=new URL(request.url()),path=url.pathname.replace("/api/v1","");
     let data:any=[],total:number|undefined;
-    if(path==="/zabbix/servers")data=[
-      {id:"primary",name:"Zabbix 1",configured:true},
+    if(path==="/auth/me")data={id:1,username:"test-admin",display_name:"Test administrator",role:"admin",must_change_password:false,csrf_token:"test-csrf"};
+    else if(path==="/auth/visit")data={};
+    else if(path==="/zabbix/servers")data=[
+      {id:"primary",name:"Zabbix 7",configured:true},
       {id:"secondary",name:"Zabbix 2",configured:true},
     ];
     else if(path==="/zabbix/hosts")data=[host,disabledHost];
+    else if(path==="/zabbix/hosts/1/details")data={...details,description:url.searchParams.get("server_id")==="secondary"?"Secondary server router":details.description};
+    else if(path==="/zabbix/hosts/2/details")data={...disabledHost,description:"",groups:[],templates:[],interfaces:[],
+      proxy:{mode:"server",id:null,name:null,assigned_proxy:null},warnings:[]};
     else if(path==="/zabbix/hosts/1/items")data=items;
     else if(path==="/zabbix/hosts/2/items")data=items.map(item=>({...item,hostid:"2"}));
     else if(path==="/zabbix/hosts/2/downtime-triggers")data=[];
@@ -46,6 +57,8 @@ async function mockAPI(page:Page, disposition='attachment; filename="Test_host_2
     }
     else if(path==="/reports"){const offset=Number(url.searchParams.get("offset")||0);
       data=Array.from({length:offset===25?1:25},(_,i)=>({filename:`report_${offset+i+1}.pdf`,created:1791327600,size:2520,download_url:"/api/v1/reports/test.pdf"}));total=26;}
+    else if(path==="/auto-schedules"||path==="/auto-schedules/host-groups")data=[];
+    else if(path==="/auto-schedules/preview")data={hosts:2,servers:[{id:"primary",hosts:2}],max_metrics_per_pdf:20};
     else if(path==="/schedules"&&request.method()==="GET")data=schedules;
     else if(path==="/schedules"&&request.method()==="POST"){data={...initial,...request.postDataJSON(),id:2};schedules.push(data);}
     else if(path==="/schedules/1"&&request.method()==="PUT"){data={...schedules[0],...request.postDataJSON()};schedules[0]=data;}
@@ -66,7 +79,200 @@ test.beforeEach(async({page})=>{
 });
 test.afterEach(async({page})=>{expect((page as any).__runtimeErrors).toEqual([]);});
 
+test("disabled login opens monitoring directly and hides account/admin controls",async({page})=>{
+  await mockAPI(page);
+  await page.route("**/api/v1/auth/me",route=>route.fulfill({json:{success:true,data:{authentication_enabled:false}}}));
+  await page.goto("/");await expect(page.getByRole("heading",{name:"Monitoring & laporan",exact:true})).toBeVisible();
+  await expect(page.getByRole("navigation").getByRole("link",{name:"Akses admin",exact:true})).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Keluar",exact:true})).toHaveCount(0);
+  await page.getByRole("navigation").getByRole("link",{name:"Jadwal",exact:true}).click();
+  await expect(page.getByRole("heading",{name:"Jadwal laporan",exact:true})).toBeVisible();
+  await page.getByRole("navigation").getByRole("link",{name:"Laporan",exact:true}).click();
+  await expect(page.getByRole("heading",{name:"Laporan & riwayat",exact:true})).toBeVisible();
+  for(const path of ["/login","/admin","/password"]){
+    await page.goto(path);await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("heading",{name:"Monitoring & laporan",exact:true})).toBeVisible();
+  }
+});
+
+async function mockCombinedTraffic(page:Page){
+  const state=await mockAPI(page);
+  const traffic=[
+    {...items[0],name:"Interface wan: Bits received",key_:"net.if.in[wan]",units:"bps"},
+    {...items[1],name:"Interface wan: Bits sent",key_:"net.if.out[wan]",units:"Mbps"},
+    {...items[0],itemid:"12",name:"CPU utilization",units:"%"},
+  ];
+  await page.route("**/api/v1/zabbix/hosts/1/items?*",route=>route.fulfill({json:{success:true,data:traffic}}));
+  await page.route("**/api/v1/zabbix/items/*/data?*",route=>{
+    const url=new URL(route.request().url());const start=Number(url.searchParams.get("time_from")),end=Number(url.searchParams.get("time_till"));
+    const item=traffic.find(item=>url.pathname.includes(`/items/${item.itemid}/`))!;
+    const value=item.itemid==="10"?1000000:1;
+    return route.fulfill({json:{success:true,data:{item,source:"history",resolution:"minute",time_from:start,time_till:end,
+      points:[{timestamp:start+120,value,min:value/2,max:value*2,last:value*1.5,num:2},
+        {timestamp:start+86340,value:value*2,last:value*2.5,num:1}],summary:{minimum:value/2,maximum:value*2,average:value*4/3,last:value*2.5,samples:3}}}});
+  });
+  return {state,traffic};
+}
+
+test("combined traffic shares a scale with green received and red sent and exports the mode",async({page})=>{
+  const {state,traffic}=await mockCombinedTraffic(page);await page.goto("/");
+  await page.getByRole("combobox",{name:"Host",exact:true}).selectOption("1");
+  await page.getByRole("checkbox",{name:traffic[1].name}).check();
+  await page.getByRole("checkbox",{name:traffic[0].name}).check();
+  await page.getByRole("combobox",{name:"Mode grafik dan PDF"}).selectOption("combined");
+  await expect(page.getByRole("combobox",{name:"Metrik grafik",exact:true})).toHaveCount(0);
+  await page.getByRole("button",{name:"Tampilkan grafik"}).click();
+  const chart=page.getByRole("img",{name:"Grafik gabungan metrik",exact:true});
+  const received=chart.locator('[data-metric-id="10"] path[fill="none"]');
+  const sent=chart.locator('[data-metric-id="11"] path[fill="none"]');
+  await expect(received).toHaveCSS("stroke","rgb(74, 222, 128)");
+  await expect(sent).toHaveCSS("stroke","rgb(251, 113, 133)");
+  expect(await received.getAttribute("d")).toBe(await sent.getAttribute("d")); // 1 Mbps and 1,000,000 bps overlap exactly.
+  const table=page.getByRole("table",{name:"Statistik harian gabungan"});
+  await expect(table.locator("tbody tr")).toHaveCount(2);
+  await expect(table).toContainText("2,50 Mbps");await expect(table).toContainText("500,00 Kbps");await expect(table).toContainText("1,33 Mbps");
+  await expect(chart).toContainText("00:00");await expect(chart).toContainText("23:59");
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+  await page.screenshot({path:test.info().outputPath("combined-traffic-dark.png"),fullPage:true});
+  await page.getByRole("switch",{name:"Mode gelap"}).click();
+  await expect(received).toHaveCSS("stroke","rgb(21, 128, 61)");await expect(sent).toHaveCSS("stroke","rgb(220, 38, 38)");
+  await page.getByLabel("Judul laporan",{exact:true}).fill("Combined traffic report");
+  const download=page.waitForEvent("download");await page.getByRole("button",{name:/Ekspor PDF/}).click();await download;
+  expect(state.generated().chart_mode).toBe("combined");expect(state.generated().item_ids).toEqual(["11","10"]);
+  await page.getByRole("combobox",{name:"Mode grafik dan PDF"}).selectOption("separate");
+  await expect(chart).toHaveCount(0);await expect(page.getByRole("combobox",{name:"Metrik grafik",exact:true})).toBeVisible();
+});
+
+test("combined charts reject incompatible units and clear after the selection changes",async({page})=>{
+  const {traffic}=await mockCombinedTraffic(page);await page.goto("/");
+  await page.getByRole("combobox",{name:"Host",exact:true}).selectOption("1");
+  await page.getByRole("combobox",{name:"Mode grafik dan PDF"}).selectOption("combined");
+  await page.getByRole("checkbox",{name:traffic[0].name}).check();
+  await expect(page.getByRole("button",{name:"Tampilkan grafik"})).toBeDisabled();
+  await page.getByRole("checkbox",{name:traffic[2].name}).check();
+  await page.getByRole("button",{name:"Tampilkan grafik"}).click();
+  await expect(page.getByRole("alert").filter({hasText:"satuan sejenis"})).toBeVisible();
+  await page.getByRole("checkbox",{name:traffic[2].name}).uncheck();
+  await page.getByRole("checkbox",{name:traffic[1].name}).check();
+  await page.getByRole("button",{name:"Tampilkan grafik"}).click();
+  await expect(page.getByRole("img",{name:"Grafik gabungan metrik"})).toBeVisible();
+  await page.getByRole("checkbox",{name:traffic[1].name}).uncheck();
+  await expect(page.getByRole("img",{name:"Grafik gabungan metrik"})).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Tampilkan grafik"})).toBeDisabled();
+});
+
+test("combined charts retain daily empty rows and continue when one series is unavailable",async({page})=>{
+  const {traffic}=await mockCombinedTraffic(page);await page.goto("/");
+  await page.getByRole("combobox",{name:"Host",exact:true}).selectOption("1");
+  for(const metric of traffic.slice(0,2))await page.getByRole("checkbox",{name:metric.name}).check();
+  await page.getByRole("combobox",{name:"Mode grafik dan PDF"}).selectOption("combined");
+  await page.getByRole("combobox",{name:"Periode laporan"}).selectOption("monthly");
+  await page.getByLabel("Bulan laporan",{exact:true}).fill("2026-03");
+  await page.getByLabel("Tanggal awal",{exact:true}).fill("18");await page.getByLabel("Tanggal akhir",{exact:true}).fill("19");
+  await page.route("**/api/v1/zabbix/items/11/data?*",route=>route.fulfill({status:502,json:{detail:"Data sent tidak tersedia."}}));
+  await page.getByRole("button",{name:"Tampilkan grafik"}).click();
+  await expect(page.getByRole("img",{name:"Grafik gabungan metrik"})).toHaveCount(2);
+  const charts=page.locator(".combined-chart");
+  await expect(charts.first()).toContainText("Data sent tidak tersedia.");
+  await expect(charts.first().locator('[data-metric-id="10"] path[fill="none"]')).not.toHaveAttribute("d","");
+  await expect(charts.last()).toContainText("Tidak ada data pada hari ini");
+  await expect(charts.last().getByRole("table").locator("tbody tr")).toHaveCount(2);
+  await expect(charts.last().getByRole("table")).toContainText("—");
+});
+
+test("selected host details show network interfaces and collapse in both themes",async({page})=>{
+  await mockAPI(page);await page.goto("/");
+  const panel=page.getByRole("region",{name:"Detail host",exact:true});
+  await expect(panel).toHaveCount(0);
+  await page.getByRole("combobox",{name:"Host",exact:true}).selectOption("1");
+  for(const value of ["10.59.0.1","161","SNMPv3","authPriv","Network devices","Network SNMP template",
+    "Core router","DC group","DC proxy","agent.example","10050"])await expect(panel).toContainText(value);
+  await expect(panel.getByRole("table",{name:"Interface host"})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+  await page.screenshot({path:test.info().outputPath("host-details-dark.png"),fullPage:true});
+  await page.getByRole("switch",{name:"Mode gelap"}).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme","light");
+  await expect(panel).toContainText("10.59.0.1");
+  await page.locator(".host-details summary").click();await expect(panel).toBeHidden();
+  await page.locator(".host-details summary").click();await expect(panel).toBeVisible();
+  await page.getByRole("combobox",{name:"Host",exact:true}).selectOption("2");
+  await expect(panel).toContainText("Archived router");
+  await expect(panel).toContainText("Tidak ada template tertaut");
+  await expect(panel).toContainText("Tidak ada group");
+  await expect(panel).toContainText("Belum diisi di Zabbix");
+  await expect(panel).toContainText("Zabbix server (tanpa proxy)");
+  await expect(panel).not.toContainText("10.59.0.1");
+  await page.getByRole("combobox",{name:"Host",exact:true}).selectOption("");await expect(panel).toHaveCount(0);
+});
+
+test("host detail failure can be retried without blocking PDF generation",async({page})=>{
+  await mockAPI(page);let requests=0;
+  await page.route("**/api/v1/zabbix/hosts/1/details?*",route=>{
+    requests++;
+    return requests===1?route.fulfill({status:502,json:{detail:"Zabbix tidak tersedia."}}):
+      route.fulfill({json:{success:true,data:details}});
+  });
+  await page.goto("/");await page.getByRole("combobox",{name:"Host",exact:true}).selectOption("1");
+  const panel=page.getByRole("region",{name:"Detail host",exact:true});
+  await expect(panel.getByRole("alert")).toContainText("Zabbix tidak tersedia");
+  await page.getByRole("checkbox",{name:/^CPU/}).check();
+  await expect(page.getByRole("button",{name:/Ekspor PDF/})).toBeEnabled();
+  await panel.getByRole("button",{name:"Coba lagi"}).click();
+  await expect(panel).toContainText("10.59.0.1");await expect(panel.getByRole("alert")).toHaveCount(0);
+});
+
+test("changing source clears host details and uses the new server",async({page})=>{
+  await mockAPI(page);await page.goto("/");
+  const hostPicker=page.getByRole("combobox",{name:"Host",exact:true});
+  const panel=page.getByRole("region",{name:"Detail host",exact:true});
+  await hostPicker.selectOption("1");await expect(panel).toContainText("Core router");
+  await page.getByRole("combobox",{name:"Sumber Zabbix"}).selectOption("secondary");
+  await expect(hostPicker).toHaveValue("");await expect(panel).toHaveCount(0);
+  await hostPicker.selectOption("1");await expect(panel).toContainText("Secondary server router");
+  await expect(panel).not.toContainText("Core router");
+});
+
+test("late host details cannot replace the newly selected host",async({page})=>{
+  await mockAPI(page);let release!:()=>void;
+  const pending=new Promise<void>(resolve=>{release=resolve;});
+  let requested=false;
+  await page.route("**/api/v1/zabbix/hosts/1/details?*",async route=>{
+    requested=true;await pending;await route.fulfill({json:{success:true,data:details}});
+  });
+  await page.goto("/");const picker=page.getByRole("combobox",{name:"Host",exact:true});
+  await picker.selectOption("1");await expect.poll(()=>requested).toBe(true);
+  await picker.selectOption("2");const panel=page.getByRole("region",{name:"Detail host",exact:true});
+  await expect(panel).toContainText("Archived router");release();
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await expect(panel).toContainText("Archived router");await expect(panel).not.toContainText("10.59.0.1");
+});
+
+test("dashboard refresh does not overlap a pending status request",async({page})=>{
+  await mockAPI(page);
+  let requests=0;
+  let release!:()=>void;
+  const pending=new Promise<void>(resolve=>{release=resolve;});
+  await page.route("**/api/v1/dashboard/status",async route=>{
+    requests++;
+    await pending;
+    await route.fulfill({json:{success:true,data:{backend:"connected",postgresql:"connected",
+      redis:"connected",zabbix:"connected",zabbix_secondary:"connected",scheduler:"running"}}});
+  });
+  await page.goto("/");
+  await expect.poll(()=>requests).toBe(1);
+  const refresh=page.getByRole("button",{name:"Refresh dashboard"});
+  await refresh.click();await refresh.click();
+  // Observe the request queue after the clicks have completed.
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  expect(requests).toBe(1);
+  release();
+  await expect(page.locator(".status-grid .service-good")).toHaveCount(6);
+  await refresh.click();
+  await expect.poll(()=>requests).toBe(2);
+});
+
 test("theme preference persists across pages and reloads with the developer credit",async({page})=>{
+  await page.addInitScript(()=>localStorage.setItem("zabbix-report-theme",localStorage.getItem("zabbix-report-theme") || "light"));
   await page.emulateMedia({colorScheme:"light"});
   await mockAPI(page);await page.goto("/");
   const toggle=page.getByRole("switch",{name:"Mode gelap"});
@@ -81,8 +287,8 @@ test("theme preference persists across pages and reloads with the developer cred
   await expect(page.locator("html")).toHaveAttribute("data-theme","dark");
   await expect(page.locator(".theme-dark-label")).toBeVisible();
   await expect(page.locator(".theme-light-label")).toBeHidden();
-  expect(await page.evaluate(()=>getComputedStyle(document.body).backgroundColor)).toBe("rgb(11, 18, 32)");
-  await expect(page.getByRole("img",{name:"Grafik CPU"}).locator('path[fill="none"]')).toHaveCSS("stroke","rgb(127, 181, 252)");
+  expect(await page.evaluate(()=>getComputedStyle(document.body).backgroundColor)).toBe("rgb(23, 23, 35)");
+  await expect(page.getByRole("img",{name:"Grafik CPU"}).locator('path[fill="none"]')).toHaveCSS("stroke","rgb(56, 189, 248)");
   expect(await page.evaluate(()=>localStorage.getItem("zabbix-report-theme"))).toBe("dark");
   await page.screenshot({path:test.info().outputPath("theme-dark-dashboard.png"),fullPage:true});
   for(const label of ["Jadwal","Laporan","Monitoring"]) {
@@ -100,14 +306,14 @@ test("theme preference persists across pages and reloads with the developer cred
   await page.reload();await expect(toggle).not.toBeChecked();
 });
 
-test("theme follows the system until the user saves a preference",async({page})=>{
-  await page.emulateMedia({colorScheme:"dark"});
+test("reference theme defaults to dark and keeps the user's saved preference",async({page})=>{
+  await page.emulateMedia({colorScheme:"light"});
   await mockAPI(page);await page.goto("/");
   const toggle=page.getByRole("switch",{name:"Mode gelap"});
   await expect(page.locator("html")).toHaveAttribute("data-theme","dark");
   await expect(toggle).toBeChecked();
   expect(await page.evaluate(()=>localStorage.getItem("zabbix-report-theme"))).toBeNull();
-  await page.emulateMedia({colorScheme:"light"});await expect(toggle).not.toBeChecked();
+  await page.emulateMedia({colorScheme:"light"});await expect(toggle).toBeChecked();
   await page.emulateMedia({colorScheme:"dark"});await expect(toggle).toBeChecked();
   await toggle.click();await expect(toggle).not.toBeChecked();
   await page.emulateMedia({colorScheme:"light"});
@@ -115,6 +321,55 @@ test("theme follows the system until the user saves a preference",async({page})=
   await expect(toggle).not.toBeChecked();
   await page.reload();await expect(toggle).not.toBeChecked();
   await expect(page.locator("html")).toHaveAttribute("data-theme","light");
+});
+
+test("reference dashboard aligns chart colors, text, and responsive layout",async({page})=>{
+  const desktop=test.info().project.name==="desktop";
+  if(desktop)await page.setViewportSize({width:1440,height:1100});
+  await mockAPI(page);
+  const traffic=[
+    {...items[0],name:"Interface internal1(): Bits received",key_:"net.if.in[internal1]",units:"bps"},
+    {...items[1],name:"Interface internal1(): Bits sent",key_:"net.if.out[internal1]",units:"bps"},
+  ];
+  await page.route("**/api/v1/zabbix/hosts/1/items?*",route=>route.fulfill({json:{success:true,data:traffic}}));
+  await page.route("**/api/v1/zabbix/items/*/data?*",route=>{
+    const url=new URL(route.request().url());
+    const start=Number(url.searchParams.get("time_from")),end=Number(url.searchParams.get("time_till"));
+    const index=url.pathname.includes("/11/")?1:0;
+    const points=Array.from({length:288},(_,i)=>{
+      const value=Math.round((.25+Math.abs(Math.sin(i*.065))*.8+Math.exp(-(((i-130)/24)**2))*8+
+        Math.exp(-(((i-215)/9)**2))*3)*1000000*(index===1?.55:1));
+      return {timestamp:start+Math.round(i*(end-start)/287),value,min:value*.9,max:value*1.1,num:1};
+    });
+    return route.fulfill({json:{success:true,data:{item:traffic[index],points,time_from:start,time_till:end,
+      source:"history",resolution:"minute"}}});
+  });
+  await page.goto("/");
+  await page.getByRole("combobox",{name:"Host",exact:true}).selectOption("1");
+  for(const item of traffic)await page.getByRole("checkbox",{name:item.name}).check();
+  await page.getByRole("combobox",{name:"Metrik grafik",exact:true}).selectOption("10");
+  await page.getByRole("button",{name:"Tampilkan grafik"}).click();
+  const received=page.getByRole("img",{name:`Grafik ${traffic[0].name}`});
+  await expect(received.locator('path[fill="none"]')).toHaveCSS("stroke","rgb(56, 189, 248)");
+  await expect(received.locator("text").first()).toHaveCSS("fill","rgb(179, 179, 203)");
+  await expect(page.locator("h1")).toHaveCSS("color","rgb(241, 241, 250)");
+  if(desktop){
+    const positions=await page.evaluate(()=>({chart:document.querySelector(".chart-card")!.getBoundingClientRect().left,
+      form:document.querySelector(".report-config")!.getBoundingClientRect().left}));
+    expect(positions.chart).toBeLessThan(positions.form);
+    await expect(page.locator(".site-header")).toHaveCSS("width","76px");
+  }
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+  await page.evaluate(()=>scrollTo(0,0));
+  await page.screenshot({path:test.info().outputPath("reference-dashboard-dark.png"),fullPage:true});
+  await page.getByRole("combobox",{name:"Metrik grafik",exact:true}).selectOption("11");
+  await page.getByRole("button",{name:"Tampilkan grafik"}).click();
+  const sent=page.getByRole("img",{name:`Grafik ${traffic[1].name}`});
+  await expect(sent.locator('path[fill="none"]')).toHaveCSS("stroke","rgb(62, 230, 181)");
+  await page.getByRole("switch",{name:"Mode gelap"}).click();
+  await expect(sent.locator('path[fill="none"]')).toHaveCSS("stroke","rgb(15, 118, 110)");
+  await page.evaluate(()=>scrollTo(0,0));
+  await page.screenshot({path:test.info().outputPath("reference-dashboard-light.png"),fullPage:true});
 });
 
 test("theme changes synchronize between browser tabs",async({page,context})=>{
@@ -147,14 +402,14 @@ test("theme can still be changed when browser storage is unavailable",async({pag
   await page.emulateMedia({colorScheme:"light"});
   await mockAPI(page);await page.goto("/");
   const toggle=page.getByRole("switch",{name:"Mode gelap"});
-  await expect(toggle).not.toBeChecked();
-  await toggle.click();await expect(toggle).toBeChecked();
-  await page.emulateMedia({colorScheme:"dark"});
-  await page.emulateMedia({colorScheme:"light"});
-  await expect(toggle).toBeChecked();
-  await page.getByRole("navigation").getByRole("link",{name:"Jadwal",exact:true}).click();
   await expect(toggle).toBeChecked();
   await toggle.click();await expect(toggle).not.toBeChecked();
+  await page.emulateMedia({colorScheme:"dark"});
+  await page.emulateMedia({colorScheme:"light"});
+  await expect(toggle).not.toBeChecked();
+  await page.getByRole("navigation").getByRole("link",{name:"Jadwal",exact:true}).click();
+  await expect(toggle).not.toBeChecked();
+  await toggle.click();await expect(toggle).toBeChecked();
 });
 
 test("host status filters include disabled hosts and retain the selected host for PDF export",async({page})=>{

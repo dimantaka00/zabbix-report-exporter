@@ -1,4 +1,13 @@
 export type Host = { hostid: string; host: string; name: string; status: string };
+export type HostDetailsData = Host & {
+  description:string;
+  groups:{groupid:string;name:string}[];
+  templates:{templateid:string;name:string}[];
+  interfaces:{interfaceid:string;type:string;main:string;ip:string;dns:string;useip:string;port:string;available:string;
+    snmp:{version:string;bulk:string;securitylevel:string} | null}[];
+  proxy:{mode:"server"|"proxy"|"proxy_group"|"unknown";id:string|null;name:string|null;assigned_proxy:{id:string;name:string|null}|null};
+  warnings:string[];
+};
 export type ZabbixServer = { id: "primary" | "secondary"; name: string; configured: boolean };
 export type Item = { itemid: string; hostid?: string; name: string; key_: string; units: string; value_type: string; status: string };
 export type Schedule = {
@@ -61,12 +70,19 @@ export async function responseError(response: Response): Promise<Error> {
   return new Error(message);
 }
 
+let csrfToken="";
+export function setCsrfToken(value:string){csrfToken=value;}
+export function getCsrfToken(){return csrfToken;}
+
 export async function api<T>(path: string, options: RequestInit = {}): Promise<{data: T; total?: number}> {
   const response = await fetch(`/api/v1${path}`, {
     cache: "no-store", ...options,
-    headers: { "Content-Type": "application/json", ...options.headers },
+    headers: { "Content-Type": "application/json", "X-CSRF-Token":csrfToken, ...options.headers },
   });
-  if (!response.ok) throw await responseError(response);
+  if (!response.ok) {
+    if(response.status===401&&typeof window!=="undefined"&&window.location.pathname!=="/login")window.location.assign("/login");
+    throw await responseError(response);
+  }
   const result = await response.json();
   if (!result.success) throw new Error("Respons layanan tidak valid.");
   return result;
