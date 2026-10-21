@@ -33,7 +33,7 @@ def validate(folder):
     findings = []
     for path in files_under(folder):
         relative = path.relative_to(folder).as_posix()
-        if ".git" in path.relative_to(folder).parts or path.name == ".env" or path.suffix.lower() in (".dump", ".key", ".pem", ".crt", ".pdf", ".zip", ".tar", ".bundle"):
+        if ".git" in path.relative_to(folder).parts or path.name == ".env" or path.suffix.lower() in (".dump", ".key", ".pem", ".crt", ".pdf", ".zip", ".tar", ".bundle", ".backup", ".bak", ".tmp", ".log"):
             findings.append(relative)
         content = path.read_bytes()
         if b"\0" in content:
@@ -53,7 +53,10 @@ def export(output, revision):
         raise ValueError("Output must not replace the source project or templates.")
     output.mkdir(parents=True)
     for tree in SOURCE_TREES:
+        extensions = {".py"} if tree.startswith("backend/") else {".conf"} if tree == "nginx" else {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".css", ".json"}
         for source in files_under(ROOT / tree):
+            if source.suffix.lower() not in extensions:
+                continue
             target = output / source.relative_to(ROOT)
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, target)

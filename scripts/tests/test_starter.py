@@ -80,7 +80,7 @@ class ExportTests(unittest.TestCase):
                 target = source / name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(ROOT / name, target)
-            for name in (".env", ".git/config", "storage/reports/private.pdf", "certs/private.key", ".cache/session.json"):
+            for name in (".env", ".git/config", "storage/reports/private.pdf", "certs/private.key", ".cache/session.json", "backend/app/legacy.py.backup", "frontend/app/legacy.tsx.backup"):
                 target = source / name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text("PRIVATE_EXPORT_SENTINEL")
@@ -92,6 +92,7 @@ class ExportTests(unittest.TestCase):
             self.assertFalse((output / ".env").exists())
             self.assertTrue((output / ".env.example").exists())
             self.assertTrue((output / "storage/reports/.gitkeep").exists())
+            self.assertFalse(list(output.rglob("*.backup")))
             self.assertIn("CONTOH ORGANISASI", (output / "frontend/lib/branding.ts").read_text())
             for record in manifest["files"]:
                 data = (output / record["path"]).read_bytes()
