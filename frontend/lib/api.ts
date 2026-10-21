@@ -74,11 +74,33 @@ let csrfToken="";
 export function setCsrfToken(value:string){csrfToken=value;}
 export function getCsrfToken(){return csrfToken;}
 
-export async function api<T>(path: string, options: RequestInit = {}): Promise<{data: T; total?: number}> {
-  const response = await fetch(`/api/v1${path}`, {
-    cache: "no-store", ...options,
-    headers: { "Content-Type": "application/json", "X-CSRF-Token":csrfToken, ...options.headers },
+function retryDelay(signal:AbortSignal | null | undefined, milliseconds:number):Promise<void> {
+  return new Promise((resolve,reject)=>{
+    const abort=()=>{clearTimeout(timer);signal?.removeEventListener("abort",abort);reject(new DOMException("Permintaan dibatalkan.","AbortError"));};
+    const timer=setTimeout(()=>{signal?.removeEventListener("abort",abort);resolve();},milliseconds);
+    if(signal?.aborted)abort();
+    else signal?.addEventListener("abort",abort,{once:true});
   });
+}
+
+export async function api<T>(path: string, options: RequestInit = {}): Promise<{data: T; total?: number}> {
+  const attempts=(options.method || "GET").toUpperCase()==="GET" ? 3 : 1;
+  let response:Response | undefined;
+  for(let attempt=0;attempt<attempts;attempt++){
+    try{
+      response=await fetch(`/api/v1${path}`, {
+        cache: "no-store", ...options,
+        headers: { "Content-Type": "application/json", "X-CSRF-Token":csrfToken, ...options.headers },
+      });
+    }catch(error){
+      if(options.signal?.aborted || !(error instanceof TypeError) || attempt===attempts-1)throw error;
+      await retryDelay(options.signal,500*2**attempt);continue;
+    }
+    if(![408,429,502,503,504].includes(response.status) || attempt===attempts-1)break;
+    await response.body?.cancel();
+    await retryDelay(options.signal,500*2**attempt);
+  }
+  if(!response)throw new Error("Layanan belum dapat dihubungi.");
   if (!response.ok) {
     if(response.status===401&&typeof window!=="undefined"&&window.location.pathname!=="/login")window.location.assign("/login");
     throw await responseError(response);

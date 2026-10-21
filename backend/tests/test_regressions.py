@@ -910,6 +910,15 @@ class DatabaseAndAPITests(unittest.IsolatedAsyncioTestCase):
             await scheduler.process_schedules()
         self.assertEqual(scheduler.heartbeat.status,"error")
 
+    async def test_completed_partial_report_warning_does_not_mark_scheduler_unhealthy(self):
+        await self.create()
+        await self.pool.execute("""UPDATE report_schedules SET last_run_date=$1,next_retry_at=NULL,
+            last_error='Downtime: trigger belum dikonfigurasi.'""", datetime.now(ZoneInfo("Asia/Jakarta")).date())
+        await scheduler.process_schedules()
+        self.assertEqual(scheduler.heartbeat.status,"running")
+        self.assertEqual(await self.pool.fetchval("SELECT last_error FROM report_schedules"),
+                         "Downtime: trigger belum dikonfigurasi.")
+
     async def test_readiness_endpoint_checks_database(self):
         self.assertEqual((await self.http.get("/health/ready")).status_code,200)
 

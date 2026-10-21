@@ -1,3 +1,4 @@
+import asyncio
 import math
 import ssl
 import time
@@ -66,9 +67,20 @@ class ZabbixClient:
                 payload["auth"] = self.api_token
             else:
                 headers["Authorization"] = f"Bearer {self.api_token}"
-        async with httpx.AsyncClient(timeout=30, verify=self.verify) as client:
-            response = await client.post(self.url, json=payload, headers=headers)
-        response.raise_for_status()
+        # All calls made by this client are reads. Retry temporary network/gateway
+        # failures here so previews and reports recover within the same request.
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30, connect=5), verify=self.verify) as client:
+            for attempt in range(3):
+                try:
+                    response = await client.post(self.url, json=payload, headers=headers)
+                    response.raise_for_status()
+                    break
+                except (httpx.TransportError, httpx.HTTPStatusError) as exc:
+                    temporary = isinstance(exc, httpx.TransportError) or exc.response.status_code in (408, 429, 502, 503, 504)
+                    read_only = method == "apiinfo.version" or method.endswith(".get")
+                    if not read_only or not temporary or attempt == 2:
+                        raise
+                    await asyncio.sleep(0.5 * 2 ** attempt)
         data = response.json()
         if "error" in data:
             error = data["error"]

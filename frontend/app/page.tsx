@@ -51,6 +51,9 @@ export default function Home() {
   const [chart,setChart] = useState<MetricData | null>(null);
   const [chartMode,setChartMode] = useState<"separate"|"combined">("separate");
   const [combinedChart,setCombinedChart] = useState<MetricData[]|null>(null);
+  const [autoRefresh,setAutoRefresh] = useState(true);
+  const [chartUpdatedAt,setChartUpdatedAt] = useState<Date|null>(null);
+  const [chartError,setChartError] = useState("");
   const [loading,setLoading] = useState(true), [loadingItems,setLoadingItems] = useState(false);
   const [loadingChart,setLoadingChart] = useState(false), [generating,setGenerating] = useState(false);
   const [error,setError] = useState(""), [dashboardError,setDashboardError] = useState("");
@@ -114,11 +117,21 @@ export default function Home() {
     if (!selected.includes(metricId)) setMetricId(selected[0] || "");
   }, [selected,metricId]);
   useEffect(() => {
-    chartRequest.current?.abort();setLoadingChart(false);setChart(null);setCombinedChart(null);
+    chartRequest.current?.abort();chartRequest.current=null;setLoadingChart(false);setChart(null);setCombinedChart(null);setChartUpdatedAt(null);setChartError("");
   }, [metricId,from,to,zabbixServer,resolution,hostId,chartMode]);
   useEffect(()=>{
-    if(chartMode==="combined"){chartRequest.current?.abort();setLoadingChart(false);setCombinedChart(null);}
+    if(chartMode==="combined"){chartRequest.current?.abort();chartRequest.current=null;setLoadingChart(false);setCombinedChart(null);setChartUpdatedAt(null);setChartError("");}
   },[selected,chartMode]);
+  const hasPreview=Boolean(chart || combinedChart);
+  useEffect(()=>{
+    if(!autoRefresh || !hasPreview)return;
+    const refresh=()=>{
+      if(document.visibilityState==="visible" && !chartRequest.current)void preview(true);
+    };
+    const timer=setInterval(refresh,15000);
+    document.addEventListener("visibilitychange",refresh);
+    return ()=>{clearInterval(timer);document.removeEventListener("visibilitychange",refresh);};
+  },[autoRefresh,hasPreview,metricId,from,to,zabbixServer,resolution,hostId,chartMode,selected]);
 
   function validateCombined(){
     if(selected.length<2)throw new Error("Pilih minimal dua metrik untuk grafik gabungan.");
@@ -157,8 +170,10 @@ export default function Home() {
       selectReportDate(from.slice(0,10) || localInput(new Date()).slice(0,10));
     }
   }
-  async function preview() {
-    setError(""); setLoadingChart(true);
+  async function preview(background=false) {
+    if(background && chartRequest.current)return;
+    if(!background)setError("");
+    setChartError("");setLoadingChart(true);
     const controller = new AbortController(); chartRequest.current?.abort(); chartRequest.current = controller;
     try {
       if (chartMode==="combined")validateCombined();
@@ -177,13 +192,16 @@ export default function Home() {
           }));
           results.push(...batch);
         }
-        if(!controller.signal.aborted)setCombinedChart(results);
+        if(background && results.some(result=>result.source==="unavailable"))throw new Error("Sebagian metrik belum dapat diperbarui. Grafik terakhir tetap ditampilkan.");
+        if(!controller.signal.aborted){setCombinedChart(results);setChartUpdatedAt(new Date());}
       }else{
         const result = await api<MetricData>(`/zabbix/items/${metricId}/data?time_from=${p.time_from}&time_till=${p.time_till}&server_id=${zabbixServer}&resolution=${resolution}`, {signal:controller.signal});
-        if(!controller.signal.aborted)setChart(result.data);
+        if(!controller.signal.aborted){setChart(result.data);setChartUpdatedAt(new Date());}
       }
-    } catch (e) {if (!controller.signal.aborted && e instanceof Error && e.name !== "AbortError") setError(e.message);}
-    finally {if (chartRequest.current === controller) setLoadingChart(false);}
+    } catch (e) {if (!controller.signal.aborted && e instanceof Error && e.name !== "AbortError") {
+      if(background)setChartError(e.message);else setError(e.message);
+    }}
+    finally {if (chartRequest.current === controller){chartRequest.current=null;setLoadingChart(false);}}
   }
   async function generate() {
     setError(""); setMessage(""); setGenerating(true);
@@ -199,11 +217,15 @@ export default function Home() {
           include_downtime:includeDowntime,downtime_trigger_id:downtimeTriggerId || null}),
       });
       if (!response.ok) throw await responseError(response);
-      const blob = await response.blob(), url = URL.createObjectURL(blob);
+      const blob = await response.blob();
+      if(await blob.slice(0,5).text()!=="%PDF-")throw new Error("File PDF belum lengkap. Periksa riwayat laporan sebelum mengunduh kembali.");
+      const url = URL.createObjectURL(blob);
       const disposition = response.headers.get("Content-Disposition") || "";
       const filename = downloadFilename(disposition, `${(host.name || host.host).replace(/[\\/:*?"<>|]/g, "_")}.pdf`);
       const link = document.createElement("a"); link.href=url; link.download=filename;
-      document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+      document.body.appendChild(link); link.click(); link.remove();
+      // Give the browser time to consume the download before releasing its URL.
+      window.setTimeout(()=>URL.revokeObjectURL(url),60000);
       const incomplete = response.headers.get("X-Report-Status") === "PARTIAL";
       setPartial(incomplete); setMessage(incomplete ? "PDF dibuat dengan sebagian data. Lihat metrik yang kosong pada PDF dan riwayat." : "PDF berhasil dibuat, disimpan, dan diunduh.");
       await refreshDashboard();
@@ -280,7 +302,10 @@ export default function Home() {
         {chartMode==="separate"?<label><span>Metrik grafik</span><select value={metricId} onChange={e => setMetricId(e.target.value)} disabled={!selected.length}>
           <option value="">Pilih metrik</option>{items.filter(i => selected.includes(i.itemid)).map(i => <option key={i.itemid} value={i.itemid}>{i.name}</option>)}</select></label>:
           <p className="muted">{selected.length} metrik terpilih akan ditampilkan bersama.</p>}
-        <div className="actions"><button onClick={preview} disabled={loadingChart || (chartMode==="combined"?selected.length<2:!metricId)}><Icon name="activity"/>{loadingChart ? "Memuat grafik…" : "Tampilkan grafik"}</button></div>
+        <div className="actions"><button onClick={()=>preview()} disabled={loadingChart || (chartMode==="combined"?selected.length<2:!metricId)}><Icon name="activity"/>{loadingChart ? "Memuat grafik…" : "Tampilkan grafik"}</button></div>
+        <label className="checkbox"><input type="checkbox" checked={autoRefresh} onChange={e=>setAutoRefresh(e.target.checked)}/>Perbarui grafik otomatis setiap 15 detik</label>
+        <p className="muted">{chartUpdatedAt ? `Data terakhir dimuat: ${chartUpdatedAt.toLocaleTimeString("id-ID")}. ` : ""}Pilih tanggal hari ini untuk memantau sampel terbaru yang sudah diterima Zabbix.</p>
+        {chartError && <p className="alert warning" role="alert">{chartError} Pembaruan berikutnya akan dicoba otomatis; data terakhir tetap ditampilkan.</p>}
         {combinedChart?<CombinedChart data={combinedChart}/>:chart ? <Chart data={chart}/> : <div className="chart-empty"><span><Icon name="chart"/></span><strong>Pratinjau belum tersedia</strong><p>Pilih metrik dan tampilkan grafik untuk melihat data dan statistiknya.</p></div>}
       </section>
     </div>

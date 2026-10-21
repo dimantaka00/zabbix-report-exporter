@@ -33,9 +33,10 @@ async def process_schedules():
                 await run_schedule(row)
             except Exception:
                 logger.exception("Schedule %s failed", row["id"])
-        # State is persisted, so another process can clear a previous failure.
+        # Completed PARTIAL reports also keep warnings in last_error. Only a
+        # failed run waiting for retry should mark the scheduler unhealthy.
         failed = await get_pool().fetchval(
-            "SELECT COUNT(*) FROM report_schedules WHERE enabled=TRUE AND last_error IS NOT NULL"
+            "SELECT COUNT(*) FROM report_schedules WHERE enabled=TRUE AND last_error IS NOT NULL AND next_retry_at IS NOT NULL"
         )
         heartbeat.status = "error" if failed else "running"
     except Exception:

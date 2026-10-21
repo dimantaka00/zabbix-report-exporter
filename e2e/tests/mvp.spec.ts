@@ -209,16 +209,18 @@ test("host detail failure can be retried without blocking PDF generation",async(
   await mockAPI(page);let requests=0;
   await page.route("**/api/v1/zabbix/hosts/1/details?*",route=>{
     requests++;
-    return requests===1?route.fulfill({status:502,json:{detail:"Zabbix tidak tersedia."}}):
+    return requests<=3?route.fulfill({status:502,json:{detail:"Zabbix tidak tersedia."}}):
       route.fulfill({json:{success:true,data:details}});
   });
   await page.goto("/");await page.getByRole("combobox",{name:"Host",exact:true}).selectOption("1");
   const panel=page.getByRole("region",{name:"Detail host",exact:true});
   await expect(panel.getByRole("alert")).toContainText("Zabbix tidak tersedia");
+  expect(requests).toBe(3);
   await page.getByRole("checkbox",{name:/^CPU/}).check();
   await expect(page.getByRole("button",{name:/Ekspor PDF/})).toBeEnabled();
   await panel.getByRole("button",{name:"Coba lagi"}).click();
   await expect(panel).toContainText("10.59.0.1");await expect(panel.getByRole("alert")).toHaveCount(0);
+  expect(requests).toBe(4);
 });
 
 test("changing source clears host details and uses the new server",async({page})=>{

@@ -68,11 +68,17 @@ async def collect_items(client, item_ids, time_from, time_till, resolution="auto
                 if not result["points"]:
                     result.setdefault("warning", "Tidak ada data untuk periode ini.")
                 return result
-            except Exception as exc:
+            except ValueError as exc:
                 return {
                     "item": {"itemid": str(item_id), "name": f"Metric {item_id}", "units": ""},
                     "source": "unavailable", "points": [],
-                    "warning": str(exc) if isinstance(exc, ValueError) else "Data metrik tidak dapat diambil dari Zabbix.",
+                    "warning": str(exc),
                 }
 
-    return await asyncio.gather(*(collect(item_id) for item_id in item_ids))
+    # Wait for every read before returning/raising; a failed fetch is not an
+    # empty historical series and must not be saved as a completed PDF batch.
+    results = await asyncio.gather(*(collect(item_id) for item_id in item_ids), return_exceptions=True)
+    failed = [str(item_id) for item_id, result in zip(item_ids, results) if isinstance(result, BaseException)]
+    if failed:
+        raise RuntimeError("Data metrik belum berhasil diambil dari Zabbix: " + ", ".join(failed))
+    return results
