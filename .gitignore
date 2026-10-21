@@ -27,7 +27,7 @@ zabbix-login.json
 schedule.json
 
 .DS_Store
-zabbix
+/zabbix
 .env
 node_modules/
 .next/

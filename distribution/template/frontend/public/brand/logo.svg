@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Network monitoring">
+  <rect width="64" height="64" rx="16" fill="#172037"/>
+  <path d="M10 34h10l6-16 10 29 7-17h11" fill="none" stroke="#67e8c0" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="10" cy="34" r="3" fill="#60a5fa"/><circle cx="54" cy="30" r="3" fill="#60a5fa"/>
+</svg>

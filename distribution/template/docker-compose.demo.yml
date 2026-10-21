@@ -1,0 +1,93 @@
+# Standalone demo. Never combine this file with the production Compose files.
+x-environment: &demo-environment
+  APP_ENV: demo
+  DATABASE_URL: postgresql://demo:demo-only-password@postgres:5432/demo
+  REDIS_URL: redis://redis:6379/0
+  ZABBIX_URL: http://demo-zabbix:8080/api_jsonrpc.php
+  ZABBIX_API_TOKEN: demo-read-only-token
+  ZABBIX_SECONDARY_URL: ""
+  ZABBIX_SECONDARY_API_TOKEN: ""
+  AUTH_ENABLED: "false"
+  AUTH_TRUSTED_PROXY_HOST: nginx
+  REPORT_STORAGE: /app/storage/reports
+  TIMEZONE: Asia/Jakarta
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: demo
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo-only-password
+    volumes:
+      - demo_database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "demo", "-d", "demo"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+  demo-zabbix:
+    build: ./demo
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health',timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+  backend:
+    image: zabbix-starter-demo-backend:1.0.0
+    build: ./backend
+    environment: *demo-environment
+    volumes:
+      - demo_reports:/app/storage/reports
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      demo-zabbix: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready',timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+  worker:
+    image: zabbix-starter-demo-backend:1.0.0
+    pull_policy: never
+    environment: *demo-environment
+    command: ["python", "-m", "app.services.scheduler.scheduler"]
+    volumes:
+      - demo_reports:/app/storage/reports
+    depends_on:
+      backend: {condition: service_healthy}
+  frontend:
+    image: zabbix-starter-demo-frontend:1.0.0
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        NEXT_PUBLIC_DEMO_MODE: "true"
+    depends_on:
+      backend: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "127.0.0.1:${DEMO_HTTP_PORT:-5011}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      backend: {condition: service_healthy}
+      frontend: {condition: service_healthy}
+
+volumes:
+  demo_database:
+  demo_reports:
