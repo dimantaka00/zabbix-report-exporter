@@ -84,7 +84,7 @@ class ExportTests(unittest.TestCase):
                 target = source / name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text("PRIVATE_EXPORT_SENTINEL")
-            output = base / "customer-source"
+            output = base / "customer-source-1.0.0"
             with patch.object(exporter, "ROOT", source), patch.object(exporter, "TEMPLATE", template), contextlib.redirect_stdout(io.StringIO()):
                 exporter.export(output, "test-revision")
             manifest = json.loads((output / "PACKAGE-MANIFEST.json").read_text())
@@ -97,7 +97,7 @@ class ExportTests(unittest.TestCase):
                 data = (output / record["path"]).read_bytes()
                 self.assertNotIn(b"PRIVATE_EXPORT_SENTINEL", data)
                 self.assertEqual(hashlib.sha256(data).hexdigest(), record["sha256"])
-            with zipfile.ZipFile(output.with_suffix(".zip")) as package:
+            with zipfile.ZipFile(output.parent / (output.name + ".zip")) as package:
                 self.assertIsNone(package.testzip())
                 self.assertTrue(any(name.endswith("/.env.example") for name in package.namelist()))
                 self.assertFalse(any(name.endswith("/.env") for name in package.namelist()))

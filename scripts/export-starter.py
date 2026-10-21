@@ -135,7 +135,7 @@ def export(output, revision):
                 "contains_production_runtime_data": False, "contains_production_credentials": False,
                 "demo_data_is_synthetic": True, "files": inventory}
     (output / "PACKAGE-MANIFEST.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    archive = output.with_suffix(".zip")
+    archive = output.parent / (output.name + ".zip")
     if archive.exists():
         raise ValueError("ZIP already exists; previous packages are preserved.")
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as package:
