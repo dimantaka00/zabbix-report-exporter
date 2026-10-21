@@ -36,27 +36,27 @@ Frontend:
 docker compose -f docker-compose.yml -f docker-compose.prod.yml logs frontend --tail=100
 
 Health Check
-curl.exe -i http://localhost:8080/health
+curl.exe -i http://localhost:5010/health
 
 Expected:
 HTTP/1.1 200 OK
 
 Zabbix API Test
-curl.exe -i http://localhost:8080/api/v1/zabbix/hosts
+curl.exe -i http://localhost:5010/api/v1/zabbix/hosts
 
 Expected:
 HTTP/1.1 200 OK
 
 Schedule
 Melihat schedule:
-curl.exe -s http://localhost:8080/api/v1/schedules
+curl.exe -s http://localhost:5010/api/v1/schedules
 
 Schedule menggunakan timezone:
 Asia/Jakarta
 
 Report
 Melihat report:
-curl.exe -s http://localhost:8080/api/v1/reports
+curl.exe -s http://localhost:5010/api/v1/reports
 
 PDF disimpan pada:
 storage/reports/
@@ -96,7 +96,7 @@ Pemulihan database produksi memerlukan pemeriksaan backup dan persetujuan pengga
 
 Port
 Hanya Nginx yang exposed ke LAN:
-8080 -> Nginx
+5010 -> Nginx
 
 Backend:
 8000 -> Docker internal
@@ -131,7 +131,7 @@ Cek:
 docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
 
 Health:
-curl.exe -i http://localhost:8080/health
+curl.exe -i http://localhost:5010/health
 
 Jika database bermasalah, gunakan backup database yang tersedia di:
 backup/

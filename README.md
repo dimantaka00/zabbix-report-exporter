@@ -18,7 +18,7 @@ Untuk menggabungkan beberapa metrik, centang minimal dua metrik lalu pilih **Mod
 
 Setelah memilih host pada **Monitoring**, panel **Detail host** otomatis menampilkan **IP address, DNS, port, versi SNMP, groups, description, templates, dan proxy** dari sumber Zabbix yang dipilih. Semua interface ditampilkan, termasuk alamat polling IP/DNS dan pengaturan bulk/security level SNMP. Panel dapat dilipat. Data yang belum diisi diberi keterangan kosong; community string serta password SNMP tidak dikirim ke browser. Detail ini digunakan untuk pemeriksaan sebelum ekspor PDF. Lihat [panduan detail host](docs/host-details.md).
 
-1. Buka `http://localhost:8080` atau alamat LAN komputer server.
+1. Buka `http://localhost:5010` atau alamat LAN komputer server.
 2. Pada **Monitoring**, pilih server Zabbix, cari host berdasarkan nama/kode, lalu cari satu atau beberapa metrik berdasarkan nama, key, ID, atau unit. Resolusi **per menit** aktif secara default dan tanggal awal adalah hari kemarin. Pilih **Tanggal laporan** untuk periode 00:00–23:59:59 waktu lokal. Grafik memakai sumbu tetap 00:00–23:59 dan kursor menampilkan waktu HH:MM serta nilai sampel. PDF menampilkan nama metrik, grafik, dan satu tabel statistik harian dengan kolom **Interface Parameter, Last, Min, Average, Max**, tanpa daftar Included metrics. Setiap nilai bandwidth memilih satuannya sendiri sesuai besar nilai: **bps, Kbps, Mbps, Gbps, atau Tbps**, dengan dua angka desimal, misalnya Last **498,85 Kbps**, Min **11,58 Kbps**, Average **2,69 Mbps**, dan Max **13,02 Mbps**. Konversi jaringan memakai basis desimal: 1 Kbps = 1.000 bps dan 1 Mbps = 1.000.000 bps. Sumbu grafik tetap memakai satu satuan per grafik. Metrik lain tetap memakai satuan aslinya dengan kolom pertama **Parameter**. **Last** adalah sampel terakhir yang tersedia pada hari itu, bukan rata-rata menit terakhir atau jumlah sampel; jika hanya tersedia trend, kolom Last menampilkan tanda kosong. Periode beberapa hari menghasilkan grafik dan statistik terpisah untuk setiap hari.
 3. Pada **Jadwal**, buat atau edit laporan harian, atur timezone dan waktu, lalu aktifkan. **Jalankan sekarang** memakai data hari kalender sebelumnya dan menandai jadwal sudah dijalankan hari ini, termasuk saat jadwal sedang nonaktif.
 4. Pada **Laporan**, unduh PDF dan tinjau riwayat. Penghapusan jadwal mempertahankan PDF dan identitas laporan di riwayat.
@@ -47,7 +47,7 @@ Pilihan host pada **Monitoring** dan **Jadwal** mencakup host **Enabled** dan **
 
 ```mermaid
 flowchart LR
-  U[Browser LAN] --> N[Nginx :8080]
+  U[Browser LAN] --> N[Nginx :5010]
   N --> F[Next.js :3000]
   N --> B[FastAPI :8000]
   B --> Z[Zabbix API]

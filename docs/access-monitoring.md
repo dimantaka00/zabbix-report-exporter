@@ -8,7 +8,7 @@ Untuk mengaktifkan kembali setelah migrasi, ubah `AUTH_ENABLED=true` pada `.env`
 
 Validasi penonaktifan lokal tersedia di [login-disabled-validation.json](login-disabled-validation.json): 121 pengujian backend dan 12 pengujian browser desktop/mobile lulus. Halaman utama/jadwal/laporan aktif merespons 200 tanpa login; API akun dan log admin merespons 403. Kode fitur login tetap tersedia untuk diaktifkan kembali.
 
-Aplikasi lokal tersedia di http://localhost:8080/login. Username bootstrap berada pada `AUTH_BOOTSTRAP_USERNAME` (default `admin`); password sementara tersedia pada `AUTH_BOOTSTRAP_PASSWORD` di `.env` lokal. Jangan menyalin `.env` ke GitHub atau chat. Password awal dibuat acak dan `.env` dibatasi untuk pemilik, SYSTEM, dan Administrators. Bootstrap hanya membuat admin saat tabel pengguna kosong; mengedit variabel tersebut setelahnya tidak mengganti password akun.
+Aplikasi lokal tersedia di http://localhost:5010/login. Username bootstrap berada pada `AUTH_BOOTSTRAP_USERNAME` (default `admin`); password sementara tersedia pada `AUTH_BOOTSTRAP_PASSWORD` di `.env` lokal. Jangan menyalin `.env` ke GitHub atau chat. Password awal dibuat acak dan `.env` dibatasi untuk pemilik, SYSTEM, dan Administrators. Bootstrap hanya membuat admin saat tabel pengguna kosong; mengedit variabel tersebut setelahnya tidak mengganti password akun.
 
 Saat pertama masuk, admin wajib mengganti password sementara dengan password minimal 12 karakter. Login berikutnya menggunakan password baru. Halaman **Akses admin** (`/admin`) tersedia hanya untuk admin, dengan:
 

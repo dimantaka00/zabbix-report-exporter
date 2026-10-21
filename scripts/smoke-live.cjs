@@ -3,7 +3,7 @@ const {chromium}=require("../e2e/node_modules/@playwright/test");
 const fs=require("node:fs/promises");
 const path=require("node:path");
 async function main(){
-  const baseURL=process.env.MVP_BASE_URL || "http://localhost:8080";
+  const baseURL=process.env.MVP_BASE_URL || "http://localhost:5010";
   const browser=await chromium.launch({channel:process.env.E2E_BROWSER_CHANNEL || "chrome"});
   const context=await browser.newContext({acceptDownloads:true,locale:"id-ID",timezoneId:"Asia/Jakarta"});
   const page=await context.newPage();

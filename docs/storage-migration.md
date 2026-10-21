@@ -1,6 +1,6 @@
 # Pemindahan penyimpanan ke drive D
 
-Pemindahan selesai pada 7 Oktober 2026. Aplikasi tetap diakses melalui http://localhost:8080 atau alamat LAN server pada port 8080.
+Pemindahan selesai pada 7 Oktober 2026. Aplikasi tetap diakses melalui http://localhost:5010 atau alamat LAN server pada port 5010.
 
 | Data | Lokasi aktif |
 | --- | --- |

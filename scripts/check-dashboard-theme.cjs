@@ -6,7 +6,7 @@ const path=require("node:path");
 async function main(){
   const browser=await chromium.launch({channel:"chrome"});
   const errors=[],views=[];
-  const baseURL=(process.env.MVP_BASE_URL || "http://127.0.0.1:8080").replace(/\/$/,"");
+  const baseURL=(process.env.MVP_BASE_URL || "http://127.0.0.1:5010").replace(/\/$/,"");
   const directory=path.resolve(__dirname,"../.cache");
   await fs.mkdir(directory,{recursive:true});
   try{

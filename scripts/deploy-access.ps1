@@ -2,7 +2,7 @@ param(
     [Parameter(Mandatory=$true)][string]$RollbackSnapshot,
     [string]$BackendImage = "codex-zabbix-access-backend:20261012",
     [string]$FrontendImage = "codex-zabbix-access-frontend:20261012",
-    [string]$BaseUrl = "http://localhost:8080"
+    [string]$BaseUrl = "http://localhost:5010"
 )
 $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
