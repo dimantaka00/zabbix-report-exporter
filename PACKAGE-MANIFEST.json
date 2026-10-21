@@ -1,7 +1,7 @@
 {
   "edition": "client-starter",
-  "version": "1.0.0",
-  "source_revision": "ef62b3356a7593e1560596bd9ac7c130b9874c41",
+  "version": "1.0.1",
+  "source_revision": "4c1678a5f85471de45768739b64b9ea7937e1f6a",
   "contains_production_runtime_data": false,
   "contains_production_credentials": false,
   "demo_data_is_synthetic": true,
@@ -12,14 +12,19 @@
       "sha256": "70e6e602abdc9609d2afeebb50fcf814f9534b95918b9a72a1323f2b0ec62890"
     },
     {
+      "path": ".gitattributes",
+      "bytes": 31,
+      "sha256": "7846b37551c23529eb00c68fbb5a435390e922d9db2625cb88681c31746b289e"
+    },
+    {
       "path": ".gitignore",
       "bytes": 274,
       "sha256": "d0a7ae59a25c5b335c972819482ffa8e40d86ca03d2aaf26b8dc4ce6a1d8adf9"
     },
     {
       "path": "LICENSE",
-      "bytes": 17099,
-      "sha256": "9221c2f936159b8446d329249fb4c0f25be510f447383a0f13336ac7985668a3"
+      "bytes": 16726,
+      "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"
     },
     {
       "path": "NOTICE",
@@ -38,8 +43,8 @@
     },
     {
       "path": "backend/Dockerfile",
-      "bytes": 305,
-      "sha256": "92ab765409d31b2574ca9bccd08f665a8f7508ac8678f73d95a59fe50c10a245"
+      "bytes": 290,
+      "sha256": "90cece5845ffa7125241aee6e9e923ac0aba74ec06eb82a4fe92c9a5dda710aa"
     },
     {
       "path": "backend/app/FastAPI.py",
@@ -408,13 +413,13 @@
     },
     {
       "path": "frontend/.dockerignore",
-      "bytes": 117,
-      "sha256": "abfcf8efb6fedbcd06bb8badaee4d8dfa6522368120cfdafcfb4ffdeaa1a7475"
+      "bytes": 108,
+      "sha256": "875b78ed9eb936514ba2a07af1086b42ffc3cb100b8971f9f72375e9589ed842"
     },
     {
       "path": "frontend/Dockerfile",
-      "bytes": 135,
-      "sha256": "6df67a7784dc4704bbdca1a7c482ac403df84c52116155e2471c5ea21112d64e"
+      "bytes": 123,
+      "sha256": "a416b664ea5102f99d31177bcec2f731960d28559cac611c3540c9d85b4649ba"
     },
     {
       "path": "frontend/Dockerfile.prod",
@@ -553,13 +558,13 @@
     },
     {
       "path": "frontend/package-lock.json",
-      "bytes": 35640,
-      "sha256": "8cf6f9d3de6e8a6e42080a17deb92602cbb3108b10c16750efdbff4cbd55c65e"
+      "bytes": 34556,
+      "sha256": "2feb4a3ff4f5d33075a270ed0a47dd7824f24c65078cbb80855172ece08442a1"
     },
     {
       "path": "frontend/package.json",
-      "bytes": 494,
-      "sha256": "a92dc40226a7a86a1e68aecb8ddec7e6998e5628cdd2bd830721f57f88923655"
+      "bytes": 473,
+      "sha256": "0386674673d384a8e2afad7700a1b21a2786ea61a5c347fee3cfb9d23192bf97"
     },
     {
       "path": "frontend/public/brand/logo.svg",
