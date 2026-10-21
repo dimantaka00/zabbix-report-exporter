@@ -1,0 +1,77 @@
+services:
+  postgres:
+    restart: unless-stopped
+
+  redis:
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+  backend:
+    image: ${COMPOSE_PROJECT_NAME:-zabbix-starter}-backend:1.0.0
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready',timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  worker:
+    image: ${COMPOSE_PROJECT_NAME:-zabbix-starter}-worker:1.0.0
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["python", "-m", "app.services.scheduler.scheduler"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import time; from app.services.scheduler.heartbeat import HEARTBEAT_FILE; assert HEARTBEAT_FILE.exists() and time.time()-HEARTBEAT_FILE.stat().st_mtime < 60"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  frontend:
+    image: ${COMPOSE_PROJECT_NAME:-zabbix-starter}-frontend:1.0.0
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  nginx:
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    ports:
+      - "${HTTP_PORT:-5010}:80"
+
+volumes:
+  postgres_data:
+  redis_data:

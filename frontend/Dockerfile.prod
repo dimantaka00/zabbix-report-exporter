@@ -1,0 +1,21 @@
+FROM node:24-bookworm-slim
+
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN npm ci
+
+COPY . .
+
+ARG NEXT_PUBLIC_DEMO_MODE=false
+ENV NEXT_PUBLIC_DEMO_MODE=$NEXT_PUBLIC_DEMO_MODE
+RUN npm run build
+
+ENV NODE_ENV=production
+
+RUN npm prune --omit=dev
+
+EXPOSE 3000
+
+CMD ["npm", "start"]

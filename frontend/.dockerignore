@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+*.bak
+*.backup
+*.dump
+frontend-pre-upgrade
+Dockerfile.prod.txt
+Dockerfile.prod.yaml

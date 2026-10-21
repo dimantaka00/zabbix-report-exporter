@@ -1,0 +1,11 @@
+Zabbix Report Exporter — Client Starter Edition
+Original developer: Daniel Christoper I.P
+
+Source code is provided under Mozilla Public License 2.0. See LICENSE.
+This distribution preserves the source license and original developer attribution.
+Third-party dependencies retain their respective licenses; see requirements.txt,
+package.json, lockfiles, and the dependency packages installed during the build.
+
+The generic logo in frontend/public/brand/logo.svg was created for this starter.
+Demo hosts, addresses, accounts and values are synthetic implementation examples.
+No endorsement or affiliation by Zabbix or any client organization is implied.
