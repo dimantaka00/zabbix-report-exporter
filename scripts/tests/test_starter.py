@@ -97,6 +97,8 @@ class ExportTests(unittest.TestCase):
             for record in manifest["files"]:
                 data = (output / record["path"]).read_bytes()
                 self.assertNotIn(b"PRIVATE_EXPORT_SENTINEL", data)
+                if not record["path"].endswith(".png"):
+                    self.assertNotIn(b"\r\n", data)
                 self.assertEqual(hashlib.sha256(data).hexdigest(), record["sha256"])
             with zipfile.ZipFile(output.parent / (output.name + ".zip")) as package:
                 self.assertIsNone(package.testzip())

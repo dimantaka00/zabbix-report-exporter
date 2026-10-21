@@ -9,7 +9,7 @@ Paket tidak menyertakan `.git`, `.env`, laporan, database, sertifikat, log, akun
 Dengan Python 3.12, dari root repository:
 
 ```sh
-python scripts/export-starter.py --output .cache/releases/zabbix-report-exporter-starter-1.0.0 --revision COMMIT_MAIN
+python scripts/export-starter.py --output .cache/releases/zabbix-report-exporter-starter-1.0.1 --revision COMMIT_MAIN
 ```
 
 Gunakan nama output baru pada setiap ekspor. Script tidak menimpa direktori/ZIP lama. Hasilnya adalah direktori source, ZIP terkompresi, dan `PACKAGE-MANIFEST.json` berisi SHA-256 setiap file. Simpan paket akhir di luar folder backup privat bila akan dikirim ke client.

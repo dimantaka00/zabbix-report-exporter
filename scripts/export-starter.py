@@ -19,6 +19,7 @@ SOURCE_FILES = ("LICENSE", "backend/Dockerfile", "backend/requirements.txt", "ba
                 "e2e/package.json", "e2e/package-lock.json", "e2e/playwright.config.ts", "docker-compose.yml", "docker-compose.prod.yml",
                 "scripts/test-regressions.ps1", "scripts/test-browser.ps1")
 SKIP = {"node_modules", ".next", "__pycache__", ".git", ".cache"}
+PACKAGE_VERSION = "1.0.1"
 
 
 def files_under(folder):
@@ -131,10 +132,17 @@ def export(output, revision):
         target = output / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, target)
+    # Keep Git clones and ZIPs byte-identical on Windows and Linux. PNG assets
+    # retain their original bytes; all other allowlisted files are UTF-8 text.
+    for path in files_under(output):
+        if path.suffix.lower() != ".png":
+            data = path.read_bytes()
+            if b"\r\n" in data:
+                path.write_bytes(data.replace(b"\r\n", b"\n"))
     validate(output)
     inventory = [{"path": path.relative_to(output).as_posix(), "bytes": path.stat().st_size,
                   "sha256": hashlib.sha256(path.read_bytes()).hexdigest()} for path in files_under(output)]
-    manifest = {"edition": "client-starter", "version": "1.0.0", "source_revision": revision,
+    manifest = {"edition": "client-starter", "version": PACKAGE_VERSION, "source_revision": revision,
                 "contains_production_runtime_data": False, "contains_production_credentials": False,
                 "demo_data_is_synthetic": True, "files": inventory}
     (output / "PACKAGE-MANIFEST.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")

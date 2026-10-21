@@ -1,6 +1,6 @@
 # Zabbix Report Exporter
 
-**Edisi client / paket distribusi:** [source bersih pada branch client-starter](https://github.com/dimantaka00/zabbix-report-exporter/tree/client-starter), [paket ZIP starter](https://github.com/dimantaka00/zabbix-report-exporter/releases/tag/starter-v1.0.0), dan [panduan pembuatan paket](distribution/README.md). Edisi client memakai branding generik, konfigurasi baru, serta demo terpisah dengan data sintetis. [Contoh gambar](distribution/template/docs/images/) dapat dipakai untuk penjelasan produk.
+**Edisi client / paket distribusi:** [source bersih pada branch client-starter](https://github.com/dimantaka00/zabbix-report-exporter/tree/client-starter), [paket ZIP starter](https://github.com/dimantaka00/zabbix-report-exporter/releases/tag/starter-v1.0.1), dan [panduan pembuatan paket](distribution/README.md). Edisi client memakai branding generik, konfigurasi baru, serta demo terpisah dengan data sintetis. [Contoh gambar](distribution/template/docs/images/) dapat dipakai untuk penjelasan produk.
 
 Aplikasi LAN internal untuk membaca metrik Zabbix, membuat laporan PDF, dan menjalankan laporan harian. MVP mencakup monitoring, laporan manual, jadwal harian, arsip PDF, riwayat eksekusi, serta backup dan uji pemulihan. Login admin/operator dan dashboard monitoring akses tersedia; saat ini dinonaktifkan sementara pada lingkungan lokal dengan `AUTH_ENABLED=false` sambil menunggu migrasi server. Lihat [login dan monitoring akses](docs/access-monitoring.md).
 
